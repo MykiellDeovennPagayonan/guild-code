@@ -48,6 +48,7 @@ export interface TransferBudgetRun {
   readonly threadSnapshot: HttpTransferMeasurement;
   readonly measuredTurnWebSocket: WebSocketTransferTotals;
   readonly shellSnapshot: HttpTransferMeasurement;
+  readonly guildSnapshot: SocketOpenMeasurement;
   readonly measuredTurnShellWebSocket: WebSocketTransferTotals;
   readonly measuredTurnSecondClientWebSocket: WebSocketTransferTotals;
   readonly reconnectThread: WebSocketCatchUpMeasurement;
@@ -140,6 +141,7 @@ const LONG_TURN_WORK_PAGE_BUDGET = {
 };
 
 const SOCKET_BUDGETS = {
+  guildSnapshot: { decodedBytes: 28_000, messages: 3 },
   // One ordinary turn replays in 11 KB. With its tool bodies it is over 900 KB.
   shortTurnResume: { decodedBytes: 13_000, messages: 2 },
   longTurnColdOpen: { decodedBytes: LONG_TURN_FINISHED_BUDGET.decodedBytes, messages: 2 },
@@ -340,6 +342,7 @@ function socketRows(
  */
 function scenarioRows(run: TransferBudgetRun): ScenarioRow[] {
   return [
+    ...socketRows("Guild snapshot", run.guildSnapshot, SOCKET_BUDGETS.guildSnapshot),
     ...socketRows("short turn resume", run.shortTurnResume, SOCKET_BUDGETS.shortTurnResume),
     ...httpRows(
       "long turn running, cold open",

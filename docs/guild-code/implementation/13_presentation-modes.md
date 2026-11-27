@@ -27,11 +27,11 @@ VIS-05, PIL-06, T3-01, T3-08, MODE-01…MODE-06, NAV-10, PTY-10, PTY-11, LATER-0
 
 ### The three modes (MODE-01…MODE-03)
 
-| Mode | What you see | Where |
-|---|---|---|
-| **Adventure** | Full-window world canvas, overlays on top, HUD | `/guild` route, sidebar hidden (`AppSidebarLayout` `showSidebar={false}`) |
-| **Hybrid** | World on the left, a working panel on the right: an adventurer's conversation (embedded `ChatView`), a quest, a diff, files or a terminal | `/guild?panel=<kind>&thread=<id>` (search params), resizable split |
-| **Focus** | The normal T3 interface, unchanged, plus small Guild additions (HUD chip, palette entries, Guild pages) | All existing T3 routes; Guild pages under `/guild/*` that render as normal pages |
+| Mode          | What you see                                                                                                                              | Where                                                                            |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| **Adventure** | Full-window world canvas, overlays on top, HUD                                                                                            | `/guild` route, sidebar hidden (`AppSidebarLayout` `showSidebar={false}`)        |
+| **Hybrid**    | World on the left, a working panel on the right: an adventurer's conversation (embedded `ChatView`), a quest, a diff, files or a terminal | `/guild?panel=<kind>&thread=<id>` (search params), resizable split               |
+| **Focus**     | The normal T3 interface, unchanged, plus small Guild additions (HUD chip, palette entries, Guild pages)                                   | All existing T3 routes; Guild pages under `/guild/*` that render as normal pages |
 
 Route (decision D-023): `apps/web/src/routes/_chat.guild.tsx` (under `_chat` for the auth guard), with child pages `_chat.guild.board.tsx`, `_chat.guild.roster.tsx`, `_chat.guild.adventurer.$id.tsx`, `_chat.guild.missions.$id.tsx`, `_chat.guild.council.tsx`, `_chat.guild.treasury.tsx` added in the increments that need them. Register `/guild` in `components/sidebar/mainAppLocation.ts` as a utility page so the sidebar and back navigation behave like Workflows and Usage.
 
@@ -70,7 +70,7 @@ Every Guild function is reachable without the world:
 
 Keybinding commands are a closed contract union (00 §7). Add:
 
-- `guild.toggle`: open Guild / return to focus mode. Default `mod+shift+g`.
+- `guild.toggle`: open Guild / return to focus mode. Default `mod+alt+g` (`mod+shift+g` stays T3's branch picker).
 - `guild.questBoard`: open the quest board. Default unbound.
 
 Each needs the contract entry (`packages/contracts/src/keybindings.ts`), a default in `packages/shared/src/keybindings.ts`, and a label in `apps/web/src/components/settings/KeybindingsSettings.logic.ts`. In-world keys (A/D, Space, E, J, Esc) are not keybinding commands; they are engine input (05) and are not remappable in v1.

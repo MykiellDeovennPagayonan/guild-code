@@ -32,12 +32,12 @@ Every number Guild shows is defined once in `packages/guild-core/src/metrics.ts`
 
 ```ts
 type MetricDef = {
-  id: string;                        // "accepted_quests"
-  label: string;                     // "Accepted quests"
-  definition: string;                // one sentence shown in a tooltip
+  id: string; // "accepted_quests"
+  label: string; // "Accepted quests"
+  definition: string; // one sentence shown in a tooltip
   source: "guild_records" | "git" | "t3_turn_usage" | "t3_usage_scan" | "derived";
   kind: "count" | "duration" | "tokens" | "money" | "ratio" | "lines";
-  estimate?: boolean;                // true → always labelled "estimate"
+  estimate?: boolean; // true → always labelled "estimate"
 };
 ```
 
@@ -47,23 +47,23 @@ The UI shows each value with its label and, on hover or in a details row, its de
 
 Computed from Guild records (queries over attempts, quests, evidence, findings, rewards), scoped by **all time, per epic, per class held at the time, per model family and per executed model**, over a chosen date range:
 
-| Metric | Source | Notes |
-|---|---|---|
-| Accepted quests | Guild | quests `accepted` with this adventurer as implementer/investigator |
-| Attempts: total, failed, cancelled, blocked time | Guild | per attempt; blocked time from activity timestamps |
-| First-pass acceptance | Derived | accepted with exactly one attempt, no `changes_requested` |
-| Rework count | Guild | `changes_requested` transitions |
-| Validated findings | Guild | findings authored with resolution `accepted` or `fixed` |
-| Confirmed bugs fixed | Guild | accepted `bounty` quests |
-| Verified test contributions | Guild + evidence | accepted `trial` quests, passing `test_run` evidence linked |
-| Lines added/removed, files modified | Git | from the attempt's diff against base **at acceptance**, `mixed`/`unattributed` excluded and shown separately (10 §Attribution) |
-| Commits, merged PRs | Git / T3 PRs | commits on the quest branch at acceptance; PRs merged that include them |
-| Active execution duration | T3 turn timestamps | sum of turn durations from `AttemptTurn` |
-| Input / output / cached tokens | T3 turn usage | sums of known values; `partial` or `unavailable` shown as such |
-| Tokens per accepted quest | Derived | only when all included attempts have `complete` usage; otherwise unknown |
-| Reported or estimated cost | T3 usage scan | labelled with `costSource` (provider-reported, list price estimate, unpriced) |
-| Model versions used | Guild | distinct `executedModel`s with turn counts |
-| Projects, parties participated | Guild | counts with links |
+| Metric                                           | Source             | Notes                                                                                                                          |
+| ------------------------------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Accepted quests                                  | Guild              | quests `accepted` with this adventurer as implementer/investigator                                                             |
+| Attempts: total, failed, cancelled, blocked time | Guild              | per attempt; blocked time from activity timestamps                                                                             |
+| First-pass acceptance                            | Derived            | accepted with exactly one attempt, no `changes_requested`                                                                      |
+| Rework count                                     | Guild              | `changes_requested` transitions                                                                                                |
+| Validated findings                               | Guild              | findings authored with resolution `accepted` or `fixed`                                                                        |
+| Confirmed bugs fixed                             | Guild              | accepted `bounty` quests                                                                                                       |
+| Verified test contributions                      | Guild + evidence   | accepted `trial` quests, passing `test_run` evidence linked                                                                    |
+| Lines added/removed, files modified              | Git                | from the attempt's diff against base **at acceptance**, `mixed`/`unattributed` excluded and shown separately (10 §Attribution) |
+| Commits, merged PRs                              | Git / T3 PRs       | commits on the quest branch at acceptance; PRs merged that include them                                                        |
+| Active execution duration                        | T3 turn timestamps | sum of turn durations from `AttemptTurn`                                                                                       |
+| Input / output / cached tokens                   | T3 turn usage      | sums of known values; `partial` or `unavailable` shown as such                                                                 |
+| Tokens per accepted quest                        | Derived            | only when all included attempts have `complete` usage; otherwise unknown                                                       |
+| Reported or estimated cost                       | T3 usage scan      | labelled with `costSource` (provider-reported, list price estimate, unpriced)                                                  |
+| Model versions used                              | Guild              | distinct `executedModel`s with turn counts                                                                                     |
+| Projects, parties participated                   | Guild              | counts with links                                                                                                              |
 
 Counting rules (STAT-03, STAT-04):
 
@@ -104,15 +104,15 @@ Fantasy names may sit beside real labels ("Mana · tokens"), but context window,
 - Everyone starts at 0 XP, level 0 (REC-07).
 - XP is awarded only by **RewardEvents**, created by `GuildService` in the same transaction as the triggering transition. Each has a unique `sourceKey`, so the same accomplishment can never award twice (XP-03):
 
-| Accomplishment | sourceKey | XP (rules v1) |
-|---|---|---|
-| Quest accepted, implementer/investigator | `quest:<questId>:accepted:<adventurerId>` | trivial 10, small 20, medium 40, large 80 |
-| Bonus: accepted on first attempt | `quest:<questId>:first_pass:<adventurerId>` | +25 % of base, rounded |
-| Bonus: independently verified | `quest:<questId>:verified:<adventurerId>` | +25 % of base, rounded |
-| Verification performed (verdict recorded, quest later accepted) | `quest:<questId>:verifier:<adventurerId>` | 50 % of quest base |
-| Finding validated (resolution accepted/fixed) | `finding:<findingId>:validated` | info 2, low 5, medium 10, high 20, critical 30 |
-| Report confirmed by the user (report deliverables) | covered by quest accepted | — |
-| Mission delivered, leader | `mission:<missionId>:delivered:<adventurerId>` | 30 + 5 per accepted quest, max 100 |
+| Accomplishment                                                  | sourceKey                                      | XP (rules v1)                                  |
+| --------------------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------- |
+| Quest accepted, implementer/investigator                        | `quest:<questId>:accepted:<adventurerId>`      | trivial 10, small 20, medium 40, large 80      |
+| Bonus: accepted on first attempt                                | `quest:<questId>:first_pass:<adventurerId>`    | +25 % of base, rounded                         |
+| Bonus: independently verified                                   | `quest:<questId>:verified:<adventurerId>`      | +25 % of base, rounded                         |
+| Verification performed (verdict recorded, quest later accepted) | `quest:<questId>:verifier:<adventurerId>`      | 50 % of quest base                             |
+| Finding validated (resolution accepted/fixed)                   | `finding:<findingId>:validated`                | info 2, low 5, medium 10, high 20, critical 30 |
+| Report confirmed by the user (report deliverables)              | covered by quest accepted                      | —                                              |
+| Mission delivered, leader                                       | `mission:<missionId>:delivered:<adventurerId>` | 30 + 5 per accepted quest, max 100             |
 
 - **Never** XP for tokens, lines, tool calls, time or attempts (XP-02).
 - Failed, cancelled or retried attempts award nothing; rework doesn't reduce the eventual award except losing the first-pass bonus. Raising a legitimate blocker or finding is never penalised (XP-02).
@@ -121,7 +121,7 @@ Fantasy names may sit beside real labels ("Mana · tokens"), but context window,
 
 ### Levels (XP-04, XP-05)
 
-- Level from total XP with a gentle curve (rules v1): XP needed for level *n* = `round(25 * n^1.6)` cumulative. Level 10 ≈ 1,000 XP, level 25 ≈ 4,300, level 50 ≈ 13,000, level 100 ≈ 40,000. Tunable by a new rules version.
+- Level from total XP with a gentle curve (rules v1): XP needed for level _n_ = `round(25 * n^1.6)` cumulative. Level 10 ≈ 1,000 XP, level 25 ≈ 4,300, level 50 ≈ 13,000, level 100 ≈ 40,000. Tunable by a new rules version.
 - Milestones at levels 10, 25, 50, 75, 100 unlock **cosmetics only**: emblem frames, capes and backs, accessories, titles, Barracks decorations (12, 04). The original appearance stays recognisable; unlocked items are optional.
 - Level never changes permissions, runtime mode, model family, tools or access, and no engineering function is locked behind it (XP-05). A unit test asserts the launch path reads nothing from level or XP.
 - The UI never describes level as skill or intelligence. Copy: "Level 12 · 1,310 XP from accepted work."

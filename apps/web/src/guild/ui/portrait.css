@@ -1,0 +1,11 @@
+@keyframes guild-idle-strip {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  canvas[data-guild-idle] {
+    animation: guild-idle-strip 840ms steps(4, end) infinite;
+  }
+}

@@ -32,18 +32,18 @@ VIS-04, PIL-03, NAV-02, NAV-04…NAV-10, ROOM-01…ROOM-12, ART-07, ART-10, MODE
 
 `apps/web/src/guild/engine/`:
 
-| File | Responsibility |
-|---|---|
-| `GuildEngine.ts` | Lifecycle (`mount`, `unmount`), loop, scene switching, entity list, event emitter to the React host |
-| `loop.ts` | Fixed-step simulation at 120 Hz (`STEP = 1/120`, as the reference), render capped per [14](14_performance-and-reliability.md) §Frame budget, hit-stop support |
-| `input.ts` | Keyboard and mouse state, focus rules (§Input focus), edge-triggered actions |
-| `player.ts` | The Guild Master's movement: a port of the reference's `update()` physics |
-| `camera.ts` | Follow camera with the reference's look-ahead (`face * 16`) and easing (`dt*7`, `dt*6`), clamped to scene bounds |
-| `scene.ts` | Scene runtime: tile grid, collision, parallax, props, doors, interactables, NPC slots |
-| `npc.ts` | NPC entities: position, walk-to-slot, clip selection from the presentation model |
-| `interaction.ts` | Target selection and prompts (§Interaction) |
-| `particles.ts` | Reference particle puffs, sparks, dust |
-| `text.ts` | The reference 3×5 pixel font, plus the glyphs Guild needs (`[ ] ' ? , ( ) #`) |
+| File             | Responsibility                                                                                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GuildEngine.ts` | Lifecycle (`mount`, `unmount`), loop, scene switching, entity list, event emitter to the React host                                                           |
+| `loop.ts`        | Fixed-step simulation at 120 Hz (`STEP = 1/120`, as the reference), render capped per [14](14_performance-and-reliability.md) §Frame budget, hit-stop support |
+| `input.ts`       | Keyboard and mouse state, focus rules (§Input focus), edge-triggered actions                                                                                  |
+| `player.ts`      | The Guild Master's movement: a port of the reference's `update()` physics                                                                                     |
+| `camera.ts`      | Follow camera with the reference's look-ahead (`face * 16`) and easing (`dt*7`, `dt*6`), clamped to scene bounds                                              |
+| `scene.ts`       | Scene runtime: tile grid, collision, parallax, props, doors, interactables, NPC slots                                                                         |
+| `npc.ts`         | NPC entities: position, walk-to-slot, clip selection from the presentation model                                                                              |
+| `interaction.ts` | Target selection and prompts (§Interaction)                                                                                                                   |
+| `particles.ts`   | Reference particle puffs, sparks, dust                                                                                                                        |
+| `text.ts`        | The reference 3×5 pixel font, plus the glyphs Guild needs (`[ ] ' ? , ( ) #`)                                                                                 |
 
 The engine draws everything into an offscreen buffer at logical resolution, then copies it to the visible canvas at a whole-number scale using the reference's `fit()` method (03 §Display rules).
 
@@ -71,20 +71,29 @@ A scene is data (`apps/web/src/guild/world/scenes/<id>.ts`) plus shared runtime:
 
 ```ts
 type SceneDef = {
-  id: SceneId;                       // "guild_hall", "recruitment_hall", ...
-  name: string;                      // "Guild Hall"
-  cols: number; rows: number;        // tile grid size
-  tiles: string[];                   // rows of tile chars: '.' empty, '#' solid, '=' platform (one-way), ...
-  palette: RoomPaletteId;            // 04 §Palette roles
+  id: SceneId; // "guild_hall", "recruitment_hall", ...
+  name: string; // "Guild Hall"
+  cols: number;
+  rows: number; // tile grid size
+  tiles: string[]; // rows of tile chars: '.' empty, '#' solid, '=' platform (one-way), ...
+  palette: RoomPaletteId; // 04 §Palette roles
   parallax: ParallaxLayerDef[];
-  props: PropPlacement[];            // decorative, no interaction
+  props: PropPlacement[]; // decorative, no interaction
   doors: DoorDef[];
-  interactables: InteractableDef[];  // quest board, desks, workstations, bell, ...
-  npcSlots: NpcSlotDef[];            // named spots where adventurers sit/stand/work
-  spawn: { x: number; y: number };   // used only when no door is involved
-  play?: { attack: boolean };        // §Play
+  interactables: InteractableDef[]; // quest board, desks, workstations, bell, ...
+  npcSlots: NpcSlotDef[]; // named spots where adventurers sit/stand/work
+  spawn: { x: number; y: number }; // used only when no door is involved
+  play?: { attack: boolean }; // §Play
 };
-type DoorDef = { id: DoorId; x: number; y: number; target: SceneId; targetDoor: DoorId; label: string; locked?: string };
+type DoorDef = {
+  id: DoorId;
+  x: number;
+  y: number;
+  target: SceneId;
+  targetDoor: DoorId;
+  label: string;
+  locked?: string;
+};
 ```
 
 Rules:
@@ -143,21 +152,21 @@ Additionally:
 
 Layout: the **Guild Hall** is the hub. A **Corridor** connects the hall to the other rooms with one door each. Recruitment Hall opens directly off the hall. Each built room is a separate side-view scene.
 
-| Room | Scene id | Built in | Props (04) | Functional purpose (brief §4.3) | Detailed in |
-|---|---|---|---|---|---|
-| Guild Hall | `guild_hall` | Inc 1 (shell), Inc 2 (quest board, inbox) | Hearth, tables, benches, quest board, bell, banners | Overview of active work, notifications, assignments, inbox, recent completions | 13 §HUD, 08 §Quest board UI |
-| Recruitment Hall | `recruitment_hall` | Inc 1 | Reception desk, candidate stand-spots, notice board | Generate candidates, choose class and model, hire | 06 |
-| Barracks | `barracks` | Inc 1 (roster), Inc 5 (personal corners) | Beds, footlockers, emblem plaques | Roster, profiles, availability, history, archive/restore | 06 §Profile, 11 |
-| Corridor | `corridor` | Inc 1 | Doors with signs, torches | Connects rooms; door signs show live counts (e.g. "Council · 2 waiting") | — |
-| Portal Room | `portal_room` | Inc 2 | Portals with project banners | Register an epic (link a project), pick the current epic | 08, 02 §Epic |
-| War Room | `war_room` | Inc 3 | Map table, banners, leader seats | Mission planning, parties, dependencies, plan approval, execution controls | 09 |
-| Council Chamber | `council` | Inc 3 | Meeting table, decision scrolls | All pending approvals (T3 permission prompts and Guild approvals), merge gates | 10 §Council |
-| Forge | `forge` | Inc 4 | Anvils, workbenches, embers | Files, editor, terminal, branches/worktrees, diffs, commits, PRs | 10 §Forge |
-| Training Grounds | `training_grounds` | Inc 4 | Dummies, targets, test stations | Test runs, failures, verification evidence | 10 §Training Grounds |
-| Treasury | `treasury` | Inc 4 | Chests, ledgers, crystals | Provider usage, tokens, known costs and limits, stats | 11 §Treasury |
-| Library | `library` | Inc 5 | Shelves, scrolls, desks | Repository exploration, project instructions, journals, docs | 12 |
-| Trophy Hall | `trophy_hall` | Inc 5 | Release banners, trophies | Verified releases, milestones, chronicles | 11 §Milestones |
-| Project portals | `portal:<epicId>` | Inc 5 | Biome-themed scene | Per-epic board, history, party area | §Portals |
+| Room             | Scene id           | Built in                                  | Props (04)                                          | Functional purpose (brief §4.3)                                                | Detailed in                 |
+| ---------------- | ------------------ | ----------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------- |
+| Guild Hall       | `guild_hall`       | Inc 1 (shell), Inc 2 (quest board, inbox) | Hearth, tables, benches, quest board, bell, banners | Overview of active work, notifications, assignments, inbox, recent completions | 13 §HUD, 08 §Quest board UI |
+| Recruitment Hall | `recruitment_hall` | Inc 1                                     | Reception desk, candidate stand-spots, notice board | Generate candidates, choose class and model, hire                              | 06                          |
+| Barracks         | `barracks`         | Inc 1 (roster), Inc 5 (personal corners)  | Beds, footlockers, emblem plaques                   | Roster, profiles, availability, history, archive/restore                       | 06 §Profile, 11             |
+| Corridor         | `corridor`         | Inc 1                                     | Doors with signs, torches                           | Connects rooms; door signs show live counts (e.g. "Council · 2 waiting")       | —                           |
+| Portal Room      | `portal_room`      | Inc 2                                     | Portals with project banners                        | Register an epic (link a project), pick the current epic                       | 08, 02 §Epic                |
+| War Room         | `war_room`         | Inc 3                                     | Map table, banners, leader seats                    | Mission planning, parties, dependencies, plan approval, execution controls     | 09                          |
+| Council Chamber  | `council`          | Inc 3                                     | Meeting table, decision scrolls                     | All pending approvals (T3 permission prompts and Guild approvals), merge gates | 10 §Council                 |
+| Forge            | `forge`            | Inc 4                                     | Anvils, workbenches, embers                         | Files, editor, terminal, branches/worktrees, diffs, commits, PRs               | 10 §Forge                   |
+| Training Grounds | `training_grounds` | Inc 4                                     | Dummies, targets, test stations                     | Test runs, failures, verification evidence                                     | 10 §Training Grounds        |
+| Treasury         | `treasury`         | Inc 4                                     | Chests, ledgers, crystals                           | Provider usage, tokens, known costs and limits, stats                          | 11 §Treasury                |
+| Library          | `library`          | Inc 5                                     | Shelves, scrolls, desks                             | Repository exploration, project instructions, journals, docs                   | 12                          |
+| Trophy Hall      | `trophy_hall`      | Inc 5                                     | Release banners, trophies                           | Verified releases, milestones, chronicles                                      | 11 §Milestones              |
+| Project portals  | `portal:<epicId>`  | Inc 5                                     | Biome-themed scene                                  | Per-epic board, history, party area                                            | §Portals                    |
 
 Until a room is built, its corridor door is locked ("Coming soon") and its functions are still reachable from focus mode and the command palette (PIL-06).
 

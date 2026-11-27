@@ -183,6 +183,9 @@ export default defineConfig({
       "infra/task-cache/vendor/**",
       // Macroscope requires one glob per line; Markdown formatting corrupts it.
       ".macroscope/ignore.md",
+      // Guild's verbatim sources: the brief is quoted word for word and the reference HTML is read-only (ART-02).
+      "docs/guild-code/brief.md",
+      "docs/guild-code/index-24.html",
       ".alchemy",
       "dist",
       "dist-electron",
@@ -608,6 +611,11 @@ export default defineConfig({
           "packages/client-runtime/src/rpc/**",
         ],
         rules: { "t3code/no-untranslated-copy": "error" },
+      },
+      {
+        // Guild copy is English only (U-006).
+        files: ["apps/web/src/guild/**"],
+        rules: { "t3code/no-untranslated-copy": "off" },
       },
       {
         // React Compiler owns memoization; upstream rules do not ban redundant useMemo/useCallback.

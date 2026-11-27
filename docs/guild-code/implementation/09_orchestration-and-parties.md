@@ -48,13 +48,13 @@ This is the brief's "independently managed provider sessions for application-lev
 - **Members** have a party role: `leader`, `implementer`, `investigator`, `reviewer`, `verifier`, `observer`. Any adventurer of any class and any level can hold any role, including leader (CLS-04, CLS-05). Class only drives defaults and suggestions.
 - **Formations** are templates of role slots plus a policy. Seeded formations (editable, deletable, more can be saved):
 
-| Formation | Slots | Policy defaults |
-|---|---|---|
-| Solo | 1 implementer | manual, no verification |
-| Bug hunt | investigator (Ranger), investigator (Scout), verifier (Cleric) | delegated, verification on |
-| Feature party | leader, 2 implementers (Warrior), reviewer (Mage), verifier (Cleric) | delegated, verification on |
-| Audit expedition | leader, 2 investigators (Scout), 2 reviewers (Mage), reviewer (Paladin), verifier (Cleric) | delegated, verification on |
-| Major expedition | leader, 4 implementers, 4 observers (paired), 2 verifiers, optional Paladin | autonomous, verification on |
+| Formation        | Slots                                                                                      | Policy defaults             |
+| ---------------- | ------------------------------------------------------------------------------------------ | --------------------------- |
+| Solo             | 1 implementer                                                                              | manual, no verification     |
+| Bug hunt         | investigator (Ranger), investigator (Scout), verifier (Cleric)                             | delegated, verification on  |
+| Feature party    | leader, 2 implementers (Warrior), reviewer (Mage), verifier (Cleric)                       | delegated, verification on  |
+| Audit expedition | leader, 2 investigators (Scout), 2 reviewers (Mage), reviewer (Paladin), verifier (Cleric) | delegated, verification on  |
+| Major expedition | leader, 4 implementers, 4 observers (paired), 2 verifiers, optional Paladin                | autonomous, verification on |
 
 Filling a formation suggests available adventurers with the preferred class; the user can pick anyone available (PTY-05). Slots can be left empty; a formation never forces its size.
 
@@ -69,11 +69,11 @@ Filling a formation suggests available adventurers with the preferred class; the
 
 Set per expedition in its policy; changing mode is an explicit user action.
 
-| Mode | Who creates quests | Who starts quests | Who accepts |
-|---|---|---|---|
-| **Manual command** | User | User (`start`) | User |
-| **Delegated command** | Leader proposes (`guild_propose_plan`); user approves the plan | Leader (`guild_start_quest`) within the approved plan, or user | User |
-| **Autonomous expedition** | Leader proposes; user approves plan, permissions, budget and verification policy up front | Scheduler, automatically, as dependencies clear | User, or automatically if the approved policy has `autoAccept` and the gate's machine evidence holds (08 §Evidence gates) |
+| Mode                      | Who creates quests                                                                        | Who starts quests                                              | Who accepts                                                                                                               |
+| ------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **Manual command**        | User                                                                                      | User (`start`)                                                 | User                                                                                                                      |
+| **Delegated command**     | Leader proposes (`guild_propose_plan`); user approves the plan                            | Leader (`guild_start_quest`) within the approved plan, or user | User                                                                                                                      |
+| **Autonomous expedition** | Leader proposes; user approves plan, permissions, budget and verification policy up front | Scheduler, automatically, as dependencies clear                | User, or automatically if the approved policy has `autoAccept` and the gate's machine evidence holds (08 §Evidence gates) |
 
 In every mode, these always escalate to the user as a GuildApproval and pause the affected quest: new quests outside the approved plan (scope change), dependency overrides, merges/integration (10), destructive actions the leader wants to authorise (it can't; only the user can), binding or permission changes, budget alerts, unresolved conflicts. The user can pause, cancel or take over at any time (ACC-CTRL).
 
@@ -107,28 +107,28 @@ A new toolkit at `apps/server/src/mcp/toolkits/guild/` following T3's pattern (0
 
 Tools are available **only to threads that are Guild attempts** (a new `EnabledWhen` predicate, e.g. `hiddenUnlessGuildAttempt`, backed by a lookup from `threadId` to attempt). Every handler first resolves the caller: thread → attempt → adventurer, quest, role, expedition policy. Anything not allowed for that role and policy is refused with a typed error the agent can read.
 
-| Tool | Who may call | Effect |
-|---|---|---|
-| `guild_context` | any Guild attempt | Read: who I am, my quest/mission, criteria, teammates, policy, allowed tools |
-| `guild_list_quests`, `guild_read_quest` | any | Read quests in my mission, with attempts, findings and notes |
-| `guild_propose_plan` | leader | Create draft quests and a `plan` or `scope_change` approval |
-| `guild_assign` | leader, delegated/autonomous | Assign party members to posted quests in the approved plan |
-| `guild_start_quest` | leader, delegated | Request `start`; the scheduler still checks everything |
-| `guild_report_blocker` | any working role | Quest → `blocked` with the blocker text |
-| `guild_submit_work` | implementer, investigator; leader for the mission report | Submit with a report and per-criterion claims; the server captures diff/commit evidence itself (08) |
-| `guild_run_tests` | verifier, implementer (Increment 4) | Run one of the epic's **user-approved** test commands; records `test_run` evidence (10 §Training Grounds) |
-| `guild_propose_journal_entry` | any (Increment 5) | Propose a journal note; it becomes an entry only when the user approves (12 §Journal) |
-| `guild_submit_finding` | reviewer, observer, verifier | Create a Finding (PTY-12) |
-| `guild_submit_verdict` | verifier | `review_verdict` pass/fail with findings |
-| `guild_request_approval` | any | Create a GuildApproval (scope change, override, destructive action, binding change) |
-| `guild_post_note` | any | Persisted handoff note on a quest, visible to its assignees and the leader |
+| Tool                                    | Who may call                                             | Effect                                                                                                    |
+| --------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `guild_context`                         | any Guild attempt                                        | Read: who I am, my quest/mission, criteria, teammates, policy, allowed tools                              |
+| `guild_list_quests`, `guild_read_quest` | any                                                      | Read quests in my mission, with attempts, findings and notes                                              |
+| `guild_propose_plan`                    | leader                                                   | Create draft quests and a `plan` or `scope_change` approval                                               |
+| `guild_assign`                          | leader, delegated/autonomous                             | Assign party members to posted quests in the approved plan                                                |
+| `guild_start_quest`                     | leader, delegated                                        | Request `start`; the scheduler still checks everything                                                    |
+| `guild_report_blocker`                  | any working role                                         | Quest → `blocked` with the blocker text                                                                   |
+| `guild_submit_work`                     | implementer, investigator; leader for the mission report | Submit with a report and per-criterion claims; the server captures diff/commit evidence itself (08)       |
+| `guild_run_tests`                       | verifier, implementer (Increment 4)                      | Run one of the epic's **user-approved** test commands; records `test_run` evidence (10 §Training Grounds) |
+| `guild_propose_journal_entry`           | any (Increment 5)                                        | Propose a journal note; it becomes an entry only when the user approves (12 §Journal)                     |
+| `guild_submit_finding`                  | reviewer, observer, verifier                             | Create a Finding (PTY-12)                                                                                 |
+| `guild_submit_verdict`                  | verifier                                                 | `review_verdict` pass/fail with findings                                                                  |
+| `guild_request_approval`                | any                                                      | Create a GuildApproval (scope change, override, destructive action, binding change)                       |
+| `guild_post_note`                       | any                                                      | Persisted handoff note on a quest, visible to its assignees and the leader                                |
 
 Rules:
 
 - Agents can never: accept quests, decide approvals, answer T3 permission prompts, change bindings, runtime modes or loadouts, or act on another mission's or project's data (NON-06).
 - Claims in `guild_submit_work` are stored as claims; evidence comes from Git, T3 and the user (08 §Evidence gates).
 - All tool actions write `GuildActivity`, so every coordination step is a persisted record next to the raw transcript (PTY-09).
-- Tool descriptions must pass evals before shipping (root AGENTS.md *Evals*). Prefer deferred exposure. Make `guild_context` and `guild_submit_work` direct for Guild attempt threads only if `McpToolExposure` can scope direct tools by predicate; otherwise keep all deferred and list the tool names in the briefing. The implementer checks which applies and records it in decisions.md.
+- Tool descriptions must pass evals before shipping (root AGENTS.md _Evals_). Prefer deferred exposure. Make `guild_context` and `guild_submit_work` direct for Guild attempt threads only if `McpToolExposure` can scope direct tools by predicate; otherwise keep all deferred and list the tool names in the briefing. The implementer checks which applies and records it in decisions.md.
 
 ### Independent review and verification (PTY-13)
 

@@ -29,20 +29,20 @@ ART-01, ART-02, ART-03, ART-04, ART-06, ART-08, ART-09, ANI-02 (pose mechanics),
 
 Read the source; this is a map.
 
-| Concept | Reference location | What it does |
-|---|---|---|
-| Frame | `FW=48, FH=42, RX=24, RY=38` (line 174) | Every frame is a 48×42 grid of palette indices. The feet ("root") sit at (24, 38). The standing character is about 24×24. |
-| Roles | `ROLE_CHARS` (177) | One character per palette slot. `.` and space are empty. `#`/`K` alias the outline. Art is authored as ASCII rows of role characters. |
-| Layer | `class Layer` (183) | A `Uint8Array(48*42)` with root-relative `set/get/rect/put/blit/merge/outline/mirrored`. `put` supports quarter-turn rotation, mirroring and role remapping. |
-| Outline | `Layer.outline` (201) | Every empty pixel touching a filled one (8-neighbour) becomes role `O`. Art is fill-only; outlines are automatic. |
-| Palettes | `FIXED`, `PALETTES` (280–291) | Fixed roles (outline, metal, wood, white, gold, dark cloth, pure white) plus eight swappable palettes for the character roles. |
-| Parts | `HEADS, FACES, TOPS, OUTFITS, BOOTS, BACKS, WEAPONS, SPECIES` (305–772) | Each part has an `id`, a `name` and pixel data or a builder. Tops and species read head metrics (`hd.L(y)`, `hd.R(y)`, `hd.shell(n)`) so every top fits every head. |
-| Build | `buildParts(cfg)` (793) | Pre-composes the head (hat back, species back, head, face, hat front, snout), torso, back accessory variants and the weapon in 8 directions. |
-| Pose | `POSE_DEF`, `POSES` (650–699) | A pose is a set of anchor offsets: body, head, near/far hand and shoulder, near/far foot (flat or tip), weapon direction and z-order, cape variant, slash effect. |
-| Compose | `composeFrame(parts, pose)` (867) | Draws one frame in a fixed z-order (back accessory, tail, far hair, far arm, legs, torso, head, effect, weapon, near arm). Arms and legs are drawn procedurally between anchors. |
-| Clips | `CLIPS` (705) | Sequences of `[poseName, ms]` with loop flags and impact frames. Run frames advance by distance (`STRIDE=5`), not time. |
-| Sheet | `buildSheet(cfg)` (903) | Every pose right-facing on row 0, mirrored on row 1. `drawChar` blits one cell. |
-| Display | `deviceBox`, `cssForDevicePx`, `fit()` (948–954, 1341) | Canvas sized to whole device pixels, picture drawn at a whole-number scale. |
+| Concept  | Reference location                                                      | What it does                                                                                                                                                                     |
+| -------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frame    | `FW=48, FH=42, RX=24, RY=38` (line 174)                                 | Every frame is a 48×42 grid of palette indices. The feet ("root") sit at (24, 38). The standing character is about 24×24.                                                        |
+| Roles    | `ROLE_CHARS` (177)                                                      | One character per palette slot. `.` and space are empty. `#`/`K` alias the outline. Art is authored as ASCII rows of role characters.                                            |
+| Layer    | `class Layer` (183)                                                     | A `Uint8Array(48*42)` with root-relative `set/get/rect/put/blit/merge/outline/mirrored`. `put` supports quarter-turn rotation, mirroring and role remapping.                     |
+| Outline  | `Layer.outline` (201)                                                   | Every empty pixel touching a filled one (8-neighbour) becomes role `O`. Art is fill-only; outlines are automatic.                                                                |
+| Palettes | `FIXED`, `PALETTES` (280–291)                                           | Fixed roles (outline, metal, wood, white, gold, dark cloth, pure white) plus eight swappable palettes for the character roles.                                                   |
+| Parts    | `HEADS, FACES, TOPS, OUTFITS, BOOTS, BACKS, WEAPONS, SPECIES` (305–772) | Each part has an `id`, a `name` and pixel data or a builder. Tops and species read head metrics (`hd.L(y)`, `hd.R(y)`, `hd.shell(n)`) so every top fits every head.              |
+| Build    | `buildParts(cfg)` (793)                                                 | Pre-composes the head (hat back, species back, head, face, hat front, snout), torso, back accessory variants and the weapon in 8 directions.                                     |
+| Pose     | `POSE_DEF`, `POSES` (650–699)                                           | A pose is a set of anchor offsets: body, head, near/far hand and shoulder, near/far foot (flat or tip), weapon direction and z-order, cape variant, slash effect.                |
+| Compose  | `composeFrame(parts, pose)` (867)                                       | Draws one frame in a fixed z-order (back accessory, tail, far hair, far arm, legs, torso, head, effect, weapon, near arm). Arms and legs are drawn procedurally between anchors. |
+| Clips    | `CLIPS` (705)                                                           | Sequences of `[poseName, ms]` with loop flags and impact frames. Run frames advance by distance (`STRIDE=5`), not time.                                                          |
+| Sheet    | `buildSheet(cfg)` (903)                                                 | Every pose right-facing on row 0, mirrored on row 1. `drawChar` blits one cell.                                                                                                  |
+| Display  | `deviceBox`, `cssForDevicePx`, `fit()` (948–954, 1341)                  | Canvas sized to whole device pixels, picture drawn at a whole-number scale.                                                                                                      |
 
 ## Design
 
@@ -98,16 +98,16 @@ Characters persist an `Appearance` value, never array indices.
 ```ts
 // conceptual shape; the Effect Schema lives in packages/contracts (02_domain-model.md)
 type Appearance = {
-  v: 1;                    // appearance schema version
-  species: string;         // part ids, e.g. "nub", "lopp"
-  head: string;            // "visor", "tall", ...
-  top: string;             // "brim", ... "bare"
-  face: string;            // "dots", ...
-  outfit: string;          // "tunic", ...
-  boots: string;           // "plain" (named "Socks"), ...
-  back: string;            // "none", "cape", ...
-  weapon: string;          // "blade", ..., and "none" once added (§Held items)
-  palette: string;         // "ember", ...
+  v: 1; // appearance schema version
+  species: string; // part ids, e.g. "nub", "lopp"
+  head: string; // "visor", "tall", ...
+  top: string; // "brim", ... "bare"
+  face: string; // "dots", ...
+  outfit: string; // "tunic", ...
+  boots: string; // "plain" (named "Socks"), ...
+  back: string; // "none", "cape", ...
+  weapon: string; // "blade", ..., and "none" once added (§Held items)
+  palette: string; // "ember", ...
 };
 ```
 
@@ -161,33 +161,33 @@ The reference poses cover idle, run, jump, double jump, fall, land and two attac
 
 New optional pose fields (defaults keep every reference pose identical):
 
-| Field | Meaning |
-|---|---|
-| `w: -1` | No weapon drawn (weapon hidden). Existing values 0..7 unchanged. |
-| `stow: true` | Draw the weapon on the back at the `back` anchor, pointing down-diagonal, behind the body. Cosmetic "sheathed" look for work poses. |
-| `hold?: HeldItemId` | Draw a held item (book, quill, hammer, scroll, flask, mug, crate, lantern, map) at the near hand instead of the weapon. Items use the weapon format (authored N and NE, quarter-turn rotation). |
-| `holdF?: HeldItemId` | Same for the far hand (for two-handed carry, e.g. a crate). |
-| `face?: FaceId` | Expression override for this pose (e.g. `sleepy` while sleeping, `happy` while celebrating). Requires a head layer per used face; build lazily and cache inside `buildParts`. |
-| `sit?: SeatHeight` | Lowers the body and bends legs: hips drop by the seat height, feet move forward. Implemented in `legLayer` as a two-segment leg (hip→knee→foot) when `sit` is set. |
-| `lie?: true` | The whole composed frame is rotated a quarter turn (exact, via `Layer` rotation) and re-anchored so the root sits on the bed surface. For sleeping. |
-| `marker?: MarkerId` | An overhead marker drawn above the head anchor: `attention` (amber "!"), `approval` (gold scroll), `zzz`, `question`, `offline`. Markers are separate small layers, not baked into the body. |
+| Field                | Meaning                                                                                                                                                                                         |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `w: -1`              | No weapon drawn (weapon hidden). Existing values 0..7 unchanged.                                                                                                                                |
+| `stow: true`         | Draw the weapon on the back at the `back` anchor, pointing down-diagonal, behind the body. Cosmetic "sheathed" look for work poses.                                                             |
+| `hold?: HeldItemId`  | Draw a held item (book, quill, hammer, scroll, flask, mug, crate, lantern, map) at the near hand instead of the weapon. Items use the weapon format (authored N and NE, quarter-turn rotation). |
+| `holdF?: HeldItemId` | Same for the far hand (for two-handed carry, e.g. a crate).                                                                                                                                     |
+| `face?: FaceId`      | Expression override for this pose (e.g. `sleepy` while sleeping, `happy` while celebrating). Requires a head layer per used face; build lazily and cache inside `buildParts`.                   |
+| `sit?: SeatHeight`   | Lowers the body and bends legs: hips drop by the seat height, feet move forward. Implemented in `legLayer` as a two-segment leg (hip→knee→foot) when `sit` is set.                              |
+| `lie?: true`         | The whole composed frame is rotated a quarter turn (exact, via `Layer` rotation) and re-anchored so the root sits on the bed surface. For sleeping.                                             |
+| `marker?: MarkerId`  | An overhead marker drawn above the head anchor: `attention` (amber "!"), `approval` (gold scroll), `zzz`, `question`, `offline`. Markers are separate small layers, not baked into the body.    |
 
 New pose families (names are pose keys; clips sequence them):
 
-| Activity | Poses | Clip | Notes |
-|---|---|---|---|
-| Walk | `k0..k5` | `walk` | Slower than run, smaller stride (`WALK_STRIDE = 3`), distance-driven like run. NPCs walk; the player runs. |
-| Sit | `s0..s1` | `sit` | Seated idle with breathing. `w: -1` or `stow`. |
-| Read | `rd0..rd2` | `read` | Seated or standing, `hold: book`, page-turn frame. |
-| Write | `wr0..wr2` | `write` | Seated, `hold: quill`, small hand movement. |
-| Think | `th0..th1` | `think` | Hand to chin, `face` unchanged. |
-| Converse | `cv0..cv2` | `talk` | Gesturing hand, facing the other character. |
-| Forge | `fg0..fg3` | `forge` | `hold: hammer`, strike with an impact frame and spark particles in the world layer. |
-| Test | `ts0..ts3` | `practice` | Uses the reference attack anchors toward a training dummy; `hold` the bound weapon. |
-| Rest | `sl0..sl1` | `sleep` | `lie: true`, `face: sleepy`, `marker: zzz`. |
-| Carry | `ca0..ca3` | `carry` | Walk variant with `hold` + `holdF` crate. |
-| Celebrate | `ce0..ce3` | `cheer` | Jump-in-place with arms up, `face: happy`. |
-| Wait | `wa0..wa1` | `wait` | Standing idle, `marker: attention` or `approval` depending on cause. |
+| Activity  | Poses      | Clip       | Notes                                                                                                      |
+| --------- | ---------- | ---------- | ---------------------------------------------------------------------------------------------------------- |
+| Walk      | `k0..k5`   | `walk`     | Slower than run, smaller stride (`WALK_STRIDE = 3`), distance-driven like run. NPCs walk; the player runs. |
+| Sit       | `s0..s1`   | `sit`      | Seated idle with breathing. `w: -1` or `stow`.                                                             |
+| Read      | `rd0..rd2` | `read`     | Seated or standing, `hold: book`, page-turn frame.                                                         |
+| Write     | `wr0..wr2` | `write`    | Seated, `hold: quill`, small hand movement.                                                                |
+| Think     | `th0..th1` | `think`    | Hand to chin, `face` unchanged.                                                                            |
+| Converse  | `cv0..cv2` | `talk`     | Gesturing hand, facing the other character.                                                                |
+| Forge     | `fg0..fg3` | `forge`    | `hold: hammer`, strike with an impact frame and spark particles in the world layer.                        |
+| Test      | `ts0..ts3` | `practice` | Uses the reference attack anchors toward a training dummy; `hold` the bound weapon.                        |
+| Rest      | `sl0..sl1` | `sleep`    | `lie: true`, `face: sleepy`, `marker: zzz`.                                                                |
+| Carry     | `ca0..ca3` | `carry`    | Walk variant with `hold` + `holdF` crate.                                                                  |
+| Celebrate | `ce0..ce3` | `cheer`    | Jump-in-place with arms up, `face: happy`.                                                                 |
+| Wait      | `wa0..wa1` | `wait`     | Standing idle, `marker: attention` or `approval` depending on cause.                                       |
 
 Body variants (ANI-03): the `build: 1` species (Orrok) widens the torso, and arms and legs already shift by `B`. Every new pose must be checked against all five species and the bulky outfits (`robe`, `suit`) in the contact sheet. Seated and lying poses must also be checked with every back accessory (wings, jetpack and cape are the risky ones) and with tall tops (wizard, long).
 

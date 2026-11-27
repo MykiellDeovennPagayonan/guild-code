@@ -1,0 +1,33 @@
+{
+  "name": "@t3tools/guild-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./binding": "./src/binding.ts",
+    "./briefing": "./src/briefing.ts",
+    "./classes": "./src/classes.ts",
+    "./families": "./src/families.ts",
+    "./lifecycle/attempt": "./src/lifecycle/attempt.ts",
+    "./names": {
+      "types": "./src/names.ts",
+      "import": "./src/names.ts"
+    },
+    "./presentation": "./src/presentation.ts",
+    "./recruitment": {
+      "types": "./src/recruitment.ts",
+      "import": "./src/recruitment.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "effect-tsgo tsrs --noEmit",
+    "test": "vp test run --config ../../vite.config.ts --dir ."
+  },
+  "dependencies": {
+    "@t3tools/contracts": "workspace:*",
+    "@t3tools/guild-art": "workspace:*"
+  },
+  "devDependencies": {
+    "vite-plus": "catalog:"
+  }
+}

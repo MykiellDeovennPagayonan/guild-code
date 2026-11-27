@@ -6,7 +6,7 @@ These rules apply to every agent that implements, reviews or documents Guild. Th
 
 1. Read [README.md](README.md) end to end. It is short on purpose.
 2. Read [decisions.md](decisions.md). Entries marked **USER** are the developer's own choices and are locked. **DEFAULT** entries are the orchestrator's choices; you may propose changing one, but you may not silently deviate from it. **OPEN** entries are unresolved; if your task touches one, stop and ask.
-3. Open your task card in [implementation/tasks/](implementation/tasks/). Read every doc it lists under *Read first*, in order.
+3. Open your task card in [implementation/tasks/](implementation/tasks/). Read every doc it lists under _Read first_, in order.
 4. For every requirement ID on the card, read its verbatim quote in [traceability.md](traceability.md). The quote is the spec. The design docs explain how to meet it; they never override it.
 5. Check [implementation/00_foundation-audit.md](implementation/00_foundation-audit.md) before relying on any T3 capability. Entries marked **checked** or **reported** carry a file citation; open the cited file before you build on it. If you need something marked **unconfirmed** or not listed, verify it in the code first and update the audit with the file and line.
 
@@ -28,7 +28,7 @@ These follow from the brief's non-goals ([traceability.md §Non-goals](traceabil
 - **Own your files.** Each card lists the files and directories it owns. Do not edit files another in-flight card owns. If you must, stop and report the overlap.
 - **State machines over booleans.** Quest, mission, run and party state are explicit enums with validated transitions (see [08_quest-lifecycle.md](implementation/08_quest-lifecycle.md)). Never derive real state from an animation, and never track workflow with loose flags.
 - **Idempotency.** Every server mutation that can be retried (reconnects, restarts, duplicate tool calls) must be safe to apply twice. Use T3's command receipts or a natural unique key; see [02_domain-model.md](implementation/02_domain-model.md).
-- **T3 conventions apply to Guild code.** Effect services with `Effect.fn("Service.operation")`, wire schemas in `packages/contracts`, client mutations through `createEnvironmentRpcCommand`, UI primitives from `apps/web/src/components/ui` without restyling, no unreasoned React effects. The root [AGENTS.md](../../AGENTS.md) *Taste* section applies in full.
+- **T3 conventions apply to Guild code.** Effect services with `Effect.fn("Service.operation")`, wire schemas in `packages/contracts`, client mutations through `createEnvironmentRpcCommand`, UI primitives from `apps/web/src/components/ui` without restyling, no unreasoned React effects. The root [AGENTS.md](../../AGENTS.md) _Taste_ section applies in full.
 - **Copy is English only** (decision U-006). Guild strings do not go through the i18n system. Fantasy labels always sit next to the real engineering term, for example "Bounty · Bug fix", "Expedition camp · worktree `quest/api`".
 - **Performance.** The game loop only runs while a Guild world view is visible and the window is focused (see [14_performance-and-reliability.md](implementation/14_performance-and-reliability.md)). Never add a continuously repainting animation outside the game canvas.
 
@@ -40,7 +40,7 @@ Every card ends with numbered checks. You are not done until each one has eviden
 - **Prove a test can fail.** For each new behavioural test, break the code briefly, watch it fail, then restore it.
 - **Art changes** need a rendered PNG contact sheet (see [04_art-pipeline.md](implementation/04_art-pipeline.md) §Review loop) that you have looked at, compared against the reference sheet, and attached to your report. The developer approves new art; agents do not.
 - **User-visible changes** need one real pass in the running app (the `test-t3-app` skill for web and desktop). Walk the flow as the user would, using the free `Replay (dev)` provider unless the card needs a real one; if so, use that provider's cheapest model.
-- **Never run a dev server against `~/.t3/userdata`.** It is the developer's live database. See the root [AGENTS.md](../../AGENTS.md) *The three ways to hurt yourself*.
+- **Never run a dev server against `~/.t3/userdata`.** It is the developer's live database. See the root [AGENTS.md](../../AGENTS.md) _The three ways to hurt yourself_.
 
 ## 5. When the design is wrong or missing
 

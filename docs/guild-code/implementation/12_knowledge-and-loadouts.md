@@ -26,12 +26,12 @@ PRO-04, CLS-01, EQP-01…EQP-05, T3-07, ROOM-06, LATER-03, LATER-08, ACC-PROG (c
 
 ### Two kinds of equipment
 
-| | Cosmetic equipment | Engineering loadout |
-|---|---|---|
-| What | Appearance parts: hats, weapons, capes, held items, emblems | Real configuration applied when Guild launches the adventurer's threads |
-| Where stored | `Adventurer.appearance` (03) | `Adventurer.defaults`, `Adventurer.instructions`, `Adventurer.loadout` |
-| Who changes it | User (creator), unlocks from levels (11) | User only, with a logged change |
-| Effect on access | **None, ever** | Only what T3 enforces (below) |
+|                  | Cosmetic equipment                                          | Engineering loadout                                                     |
+| ---------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------- |
+| What             | Appearance parts: hats, weapons, capes, held items, emblems | Real configuration applied when Guild launches the adventurer's threads |
+| Where stored     | `Adventurer.appearance` (03)                                | `Adventurer.defaults`, `Adventurer.instructions`, `Adventurer.loadout`  |
+| Who changes it   | User (creator), unlocks from levels (11)                    | User only, with a logged change                                         |
+| Effect on access | **None, ever**                                              | Only what T3 enforces (below)                                           |
 
 The suggested metaphors (spellbook for documentation tools, hammer for build tooling, shield for security checks, staff for test tools, backpack for context) appear only as **icons on loadout entries**, never as appearance items that imply access.
 

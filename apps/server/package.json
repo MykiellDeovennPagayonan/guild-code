@@ -41,6 +41,8 @@
     "@effect/platform-node-shared": "catalog:",
     "@ff-labs/fff-node": "0.11.0",
     "@muse-code/sdk": "1.4.6",
+    "@t3tools/guild-art": "workspace:*",
+    "@t3tools/guild-core": "workspace:*",
     "@t3tools/issue-tracker-jira": "workspace:*",
     "@t3tools/issue-tracker-linear": "workspace:*",
     "@t3tools/provider-acp": "workspace:*",

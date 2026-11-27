@@ -134,6 +134,9 @@ import * as ProviderSessionManager from "./orchestration-v2/ProviderSessionManag
 import * as ThreadLaunchService from "./orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadMessageIntake from "./orchestration-v2/ThreadMessageIntake.ts";
 import * as DocumentText from "./provider/DocumentText.ts";
+import { GuildPersistenceError } from "@t3tools/contracts/guild";
+import * as GuildService from "./guild/GuildService.ts";
+import type { GuildStoreError } from "./guild/GuildStore.ts";
 import * as ScheduledTasks from "./scheduledTasks/ScheduledTaskService.ts";
 import * as Workflows from "./workflows/Workflows.ts";
 import * as WorkflowRuntime from "./workflows/WorkflowRuntime.ts";
@@ -737,8 +740,10 @@ const ServerWsRpcGroup = WsRpcGroup.middleware(RpcInstrumentation);
 // RpcGroup.toLayer derives each handler's requirements by scanning every RPC in
 // the group, so its type cost grows with handlers × RPCs. Near 200 methods that
 // crosses TypeScript's instantiation limit and the layer's requirements degrade to
-// `any`, so the handlers are registered as two disjoint, smaller groups.
+// `any`, so handlers are registered in disjoint, smaller groups.
 type ServerWsRpc = RpcGroup.Rpcs<typeof ServerWsRpcGroup>;
+type GuildWsRpc = Extract<ServerWsRpc, { readonly _tag: `guild.${string}` }>;
+type T3WsRpc = Exclude<ServerWsRpc, GuildWsRpc>;
 const SPLIT_WS_RPC_PREFIXES = [
   "server",
   "pullRequests",
@@ -748,16 +753,20 @@ const SPLIT_WS_RPC_PREFIXES = [
   "orchestration",
 ] as const;
 type SplitWsRpc = Extract<
-  ServerWsRpc,
+  T3WsRpc,
   { readonly _tag: `${(typeof SPLIT_WS_RPC_PREFIXES)[number]}.${string}` }
 >;
-const isSplitWsRpc = (rpc: ServerWsRpc): rpc is SplitWsRpc =>
+const isGuildWsRpc = (rpc: ServerWsRpc): rpc is GuildWsRpc => rpc._tag.startsWith("guild.");
+const isT3WsRpc = (rpc: ServerWsRpc): rpc is T3WsRpc => !isGuildWsRpc(rpc);
+const isSplitWsRpc = (rpc: T3WsRpc): rpc is SplitWsRpc =>
   SPLIT_WS_RPC_PREFIXES.some((prefix) => rpc._tag.startsWith(`${prefix}.`));
-const isOtherWsRpc = (rpc: ServerWsRpc): rpc is Exclude<ServerWsRpc, SplitWsRpc> =>
-  !isSplitWsRpc(rpc);
+const isOtherWsRpc = (rpc: T3WsRpc): rpc is Exclude<T3WsRpc, SplitWsRpc> => !isSplitWsRpc(rpc);
 const serverWsRpcs = Array.from(ServerWsRpcGroup.requests.values());
-const SplitWsRpcGroup = RpcGroup.make(...serverWsRpcs.filter(isSplitWsRpc));
-const OtherWsRpcGroup = RpcGroup.make(...serverWsRpcs.filter(isOtherWsRpc));
+const t3WsRpcs = serverWsRpcs.filter(isT3WsRpc);
+const T3WsRpcGroup = RpcGroup.make(...t3WsRpcs);
+const GuildWsRpcGroup = RpcGroup.make(...serverWsRpcs.filter(isGuildWsRpc));
+const SplitWsRpcGroup = RpcGroup.make(...t3WsRpcs.filter(isSplitWsRpc));
+const OtherWsRpcGroup = RpcGroup.make(...t3WsRpcs.filter(isOtherWsRpc));
 function toAuthAccessStreamEvent(
   change: Exclude<
     PairingGrantStore.BootstrapCredentialChange | SessionStore.SessionCredentialChange,
@@ -1455,6 +1464,15 @@ export const subscribeOrchestrationV2Shell = Effect.fn("ws.orchestrationV2.subsc
   },
 );
 
+function guildRpcError<E extends { readonly _tag: string }>(
+  error: E,
+): GuildPersistenceError | Exclude<E, GuildStoreError> {
+  if (error._tag === "PersistenceSqlError" || error._tag === "PersistenceDecodeError") {
+    return new GuildPersistenceError({ cause: error });
+  }
+  return error as Exclude<E, GuildStoreError>;
+}
+
 export const layerWsRpc = (
   currentSession: EnvironmentAuth.AuthenticatedSession,
   clientAnalyticsProps: Readonly<Record<string, unknown>>,
@@ -1509,6 +1527,7 @@ export const layerWsRpc = (
       const commandOutputHub = yield* CommandOutputHub.CommandOutputHub;
       const threadViewers = yield* ThreadViewers.ThreadViewers;
       const providerSessionManager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+      const guild = yield* GuildService.GuildService;
       const scheduledTasks = yield* ScheduledTasks.ScheduledTaskService;
       const workflows = yield* Workflows.Workflows;
       const workflowDefinitions = yield* WorkflowRuntime.WorkflowDefinitions;
@@ -2040,7 +2059,55 @@ export const layerWsRpc = (
         return yield* mutateProjectWithClone(projectService, projectCloneTracker, mutation);
       });
 
-      const handlers = ServerWsRpcGroup.of({
+      const guildHandlers = GuildWsRpcGroup.of({
+        [WS_METHODS.guildSubscribe]: (input) =>
+          guild.subscribe(input).pipe(Stream.mapError(guildRpcError)),
+        [WS_METHODS.guildCreateMaster]: (input) =>
+          guild.createMaster(input).pipe(Effect.mapError(guildRpcError)),
+        [WS_METHODS.guildUpdateMaster]: (input) =>
+          guild.updateMaster(input).pipe(Effect.mapError(guildRpcError)),
+        [WS_METHODS.guildSetMasterLocation]: (input) =>
+          guild.setMasterLocation(input).pipe(Effect.mapError(guildRpcError)),
+        [WS_METHODS.guildRefreshCandidates]: (input) =>
+          guild.refreshCandidates(input).pipe(Effect.mapError(guildRpcError)),
+        [WS_METHODS.guildGetAdventurerProfile]: (input) =>
+          guild.getAdventurerProfile(input).pipe(Effect.mapError(guildRpcError)),
+        [WS_METHODS.guildListAttempts]: (input) =>
+          guild.listAttempts(input).pipe(Effect.mapError(guildRpcError)),
+        [WS_METHODS.guildHireAdventurer]: (input) =>
+          guild
+            .hireAdventurer(input)
+            .pipe(
+              Effect.provideService(ProviderRegistry.ProviderRegistry, providerRegistry),
+              Effect.mapError(guildRpcError),
+            ),
+        [WS_METHODS.guildStartConversation]: (input) =>
+          guild
+            .startConversation(input)
+            .pipe(
+              Effect.provideService(ProviderRegistry.ProviderRegistry, providerRegistry),
+              Effect.provideService(ProjectStore.ProjectStoreV2, projectStore),
+              Effect.mapError(guildRpcError),
+            ),
+        [WS_METHODS.guildContinueConversation]: (input) =>
+          guild
+            .continueConversation(input)
+            .pipe(
+              Effect.provideService(ProviderRegistry.ProviderRegistry, providerRegistry),
+              Effect.mapError(guildRpcError),
+            ),
+        [WS_METHODS.guildEndConversation]: (input) =>
+          guild
+            .endConversation(input)
+            .pipe(
+              Effect.provideService(
+                ThreadManagementService.ThreadManagementService,
+                threadManagement,
+              ),
+              Effect.mapError(guildRpcError),
+            ),
+      });
+      const handlers = T3WsRpcGroup.of({
         [WS_METHODS.issuesList]: (input) => issues.list(input),
         [WS_METHODS.issuesDetail]: (input) => issues.detail(input),
         [WS_METHODS.issuesComments]: (input) => issues.comments(input),
@@ -3794,11 +3861,11 @@ export const layerWsRpc = (
           ),
       });
       const splitHandlers: Pick<typeof handlers, SplitWsRpc["_tag"]> = handlers;
-      const otherHandlers: Pick<typeof handlers, Exclude<ServerWsRpc, SplitWsRpc>["_tag"]> =
-        handlers;
-      return Context.merge(
+      const otherHandlers: Pick<typeof handlers, Exclude<T3WsRpc, SplitWsRpc>["_tag"]> = handlers;
+      return Context.mergeAll(
         yield* SplitWsRpcGroup.toHandlers(splitHandlers),
         yield* OtherWsRpcGroup.toHandlers(otherHandlers),
+        yield* GuildWsRpcGroup.toHandlers(guildHandlers),
       );
     }),
   );
@@ -3811,6 +3878,7 @@ export const WS_RPC_SERVER_OPTIONS = {
 
 export const layer = Layer.unwrap(
   Effect.gen(function* () {
+    const guild = yield* GuildService.GuildService;
     const serverBrowser = yield* ServerBrowser.ServerBrowser;
     const serverSelfUpdate = yield* ServerSelfUpdate.ServerSelfUpdate;
     const providerMaintenanceRunner = yield* ProviderMaintenanceRunner.ProviderMaintenanceRunner;
@@ -3904,6 +3972,7 @@ export const layer = Layer.unwrap(
               // Handler-context reporters see only request defects, not server-wide defects.
               Layer.provide(DefectReporter.layer),
               Layer.provide(AcpRegistrySessions.layer),
+              Layer.provide(Layer.succeed(GuildService.GuildService, guild)),
               Layer.provide(Layer.succeed(SqlClient.SqlClient, sql)),
               // Installs outlive the connection that started them and lock across clients.
               Layer.provide(

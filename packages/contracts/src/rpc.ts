@@ -490,6 +490,31 @@ import {
 import { VcsError } from "./vcs.ts";
 import { Project, ProjectMutation, ProjectMutationError } from "./project.ts";
 
+import {
+  Adventurer,
+  Attempt,
+  GuildAdventurerNotFoundError,
+  GuildAdventurerProfile,
+  GuildAttemptPage,
+  GuildCommandConflictError,
+  GuildCommandRejection,
+  GuildCreateMasterInput,
+  GuildContinueConversationInput,
+  GuildEndConversationInput,
+  GuildGetAdventurerProfileInput,
+  GuildHireAdventurerInput,
+  GuildListAttemptsInput,
+  GuildMaster,
+  GuildPersistenceError,
+  GuildRefreshCandidatesInput,
+  GuildSetMasterLocationInput,
+  GuildSettings,
+  GuildStartConversationInput,
+  GuildStreamItem,
+  GuildSubscribeInput,
+  GuildUpdateMasterInput,
+} from "./guild.ts";
+
 export const WS_METHODS = {
   projectsListEntries: "projects.listEntries",
   projectsListIgnoredFiles: "projects.listIgnoredFiles",
@@ -654,6 +679,17 @@ export const WS_METHODS = {
   workflowsSaveDefinition: "workflows.saveDefinition",
   workflowsDeleteDefinition: "workflows.deleteDefinition",
 
+  guildSubscribe: "guild.subscribe",
+  guildCreateMaster: "guild.createMaster",
+  guildUpdateMaster: "guild.updateMaster",
+  guildSetMasterLocation: "guild.setMasterLocation",
+  guildRefreshCandidates: "guild.refreshCandidates",
+  guildGetAdventurerProfile: "guild.getAdventurerProfile",
+  guildListAttempts: "guild.listAttempts",
+  guildHireAdventurer: "guild.hireAdventurer",
+  guildStartConversation: "guild.startConversation",
+  guildContinueConversation: "guild.continueConversation",
+  guildEndConversation: "guild.endConversation",
   scheduledTasksSubscribe: "scheduledTasks.subscribe",
   scheduledTasksUpsert: "scheduledTasks.upsert",
   scheduledTasksSetEnabled: "scheduledTasks.setEnabled",
@@ -2403,6 +2439,81 @@ const WsWorkflowsDeleteDefinitionRpc = Rpc.make(WS_METHODS.workflowsDeleteDefini
   error: EnvironmentAuthorizationError,
 });
 
+const GuildReadError = Schema.Union([GuildPersistenceError, EnvironmentAuthorizationError]);
+const GuildProfileError = Schema.Union([GuildAdventurerNotFoundError, GuildReadError]);
+const GuildMutationError = Schema.Union([
+  GuildCommandRejection,
+  GuildCommandConflictError,
+  GuildReadError,
+]);
+
+export const GuildSubscribeRpc = Rpc.make(WS_METHODS.guildSubscribe, {
+  payload: GuildSubscribeInput,
+  success: GuildStreamItem,
+  error: GuildReadError,
+  stream: true,
+});
+
+const GuildCreateMasterRpc = Rpc.make(WS_METHODS.guildCreateMaster, {
+  payload: GuildCreateMasterInput,
+  success: GuildMaster,
+  error: GuildMutationError,
+});
+
+const GuildUpdateMasterRpc = Rpc.make(WS_METHODS.guildUpdateMaster, {
+  payload: GuildUpdateMasterInput,
+  success: GuildMaster,
+  error: GuildMutationError,
+});
+
+const GuildSetMasterLocationRpc = Rpc.make(WS_METHODS.guildSetMasterLocation, {
+  payload: GuildSetMasterLocationInput,
+  success: GuildMaster,
+  error: GuildMutationError,
+});
+
+const GuildRefreshCandidatesRpc = Rpc.make(WS_METHODS.guildRefreshCandidates, {
+  payload: GuildRefreshCandidatesInput,
+  success: GuildSettings,
+  error: GuildMutationError,
+});
+
+const GuildGetAdventurerProfileRpc = Rpc.make(WS_METHODS.guildGetAdventurerProfile, {
+  payload: GuildGetAdventurerProfileInput,
+  success: GuildAdventurerProfile,
+  error: GuildProfileError,
+});
+
+const GuildListAttemptsRpc = Rpc.make(WS_METHODS.guildListAttempts, {
+  payload: GuildListAttemptsInput,
+  success: GuildAttemptPage,
+  error: GuildReadError,
+});
+
+const GuildHireAdventurerRpc = Rpc.make(WS_METHODS.guildHireAdventurer, {
+  payload: GuildHireAdventurerInput,
+  success: Adventurer,
+  error: GuildMutationError,
+});
+
+const GuildStartConversationRpc = Rpc.make(WS_METHODS.guildStartConversation, {
+  payload: GuildStartConversationInput,
+  success: Attempt,
+  error: GuildMutationError,
+});
+
+const GuildContinueConversationRpc = Rpc.make(WS_METHODS.guildContinueConversation, {
+  payload: GuildContinueConversationInput,
+  success: Attempt,
+  error: GuildMutationError,
+});
+
+const GuildEndConversationRpc = Rpc.make(WS_METHODS.guildEndConversation, {
+  payload: GuildEndConversationInput,
+  success: Attempt,
+  error: GuildMutationError,
+});
+
 const WsScheduledTasksSubscribeRpc = Rpc.make(WS_METHODS.scheduledTasksSubscribe, {
   payload: ScheduledTaskListInput,
   success: ScheduledTaskListResult,
@@ -2495,6 +2606,20 @@ export class RpcScopeAuthorization extends RpcMiddleware.Service<RpcScopeAuthori
   "t3/contracts/RpcScopeAuthorization",
   { error: EnvironmentAuthorizationError },
 ) {}
+
+const GuildRpcGroup = RpcGroup.make(
+  GuildSubscribeRpc,
+  GuildCreateMasterRpc,
+  GuildUpdateMasterRpc,
+  GuildSetMasterLocationRpc,
+  GuildRefreshCandidatesRpc,
+  GuildGetAdventurerProfileRpc,
+  GuildListAttemptsRpc,
+  GuildHireAdventurerRpc,
+  GuildStartConversationRpc,
+  GuildContinueConversationRpc,
+  GuildEndConversationRpc,
+);
 
 export const WsRpcGroup = RpcGroup.make(
   WsIssuesListRpc,
@@ -2758,4 +2883,6 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2SubscribeThreadRpc,
   WsOrchestrationV2SubscribeCommandOutputRpc,
   WsOrchestrationV2SubscribePromptSuggestionRpc,
-).middleware(RpcScopeAuthorization);
+)
+  .merge(GuildRpcGroup)
+  .middleware(RpcScopeAuthorization);
