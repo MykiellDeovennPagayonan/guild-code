@@ -6,12 +6,16 @@ import * as NodeUtil from "node:util";
 import * as NodeZlib from "node:zlib";
 import { DEFAULT_APPEARANCE, type Appearance } from "../src/appearance.ts";
 import { buildParts, composeFrame, type Anchors } from "../src/compose.ts";
-import { FH, FW, RX, RY } from "../src/frame.ts";
-import { paletteTable, type RGB } from "../src/palettes.ts";
+import { FH, FW, RX, RY, type PropLayer } from "../src/frame.ts";
+import { FIXED, hexRGB, paletteTable, type RGB } from "../src/palettes.ts";
+import { MARKERS, MARKER_TABLE } from "../src/markers.ts";
 import { CATS, getPart } from "../src/parts/registry.ts";
 import { CLIPS, POSE_DEF, POSES, type Pose } from "../src/poses.ts";
+import { PROPS, ROOM_PROPS } from "../src/props/index.ts";
+import { ROOM_PALETTES, TILE, type RoomId } from "../src/props/palettes.ts";
 import { buildSheetFrames, toRGBA } from "../src/sheet.ts";
 import { loadReference } from "../test/reference.ts";
+import { renderRoomReview, checkRoomContrast, pasteLayer } from "./review-rooms.ts";
 
 interface Image {
   readonly width: number;
@@ -83,6 +87,8 @@ const FONT = Object.fromEntries(
     .map((glyph) => [glyph[0], glyph.slice(1)]),
 );
 
+const LABEL_COLOR = [...hexRGB(FIXED.W), 255];
+
 function label(image: Image, text: string, x: number, y: number) {
   for (const [i, ch] of [...text.toUpperCase()].entries()) {
     const glyph = FONT[ch];
@@ -90,7 +96,7 @@ function label(image: Image, text: string, x: number, y: number) {
     for (let j = 0; j < glyph.length; j++) {
       if (glyph[j] === "1") {
         image.data.set(
-          [239, 233, 246, 255],
+          LABEL_COLOR,
           ((y + Math.floor(j / 3)) * image.width + x + 4 * i + (j % 3)) * 4,
         );
       }
@@ -129,7 +135,8 @@ function write(name: string, image: Image) {
 
 function reviewSheet(width: number, height: number) {
   const image = makeImage(width, height);
-  for (let i = 0; i < image.data.length; i += 4) image.data.set([56, 47, 68, 255], i);
+  const background = [...ROOM_PALETTES.guild_hall[TILE.base]!, 255];
+  for (let i = 0; i < image.data.length; i += 4) image.data.set(background, i);
   return image;
 }
 
@@ -231,12 +238,35 @@ const reviewClips = [
   },
 ];
 for (const { key, names, poses } of reviewClips) {
-  const image = reviewSheet(GUTTER + poses.length * FW, 7 + samples.length * FH * 2);
-  for (const [i, name] of names.entries()) label(image, name, GUTTER + i * FW + 2, 1);
+  const seated = key === "sit" || key === "write";
+  const cellWidth = seated ? 68 : FW;
+  const image = reviewSheet(GUTTER + poses.length * cellWidth, 7 + samples.length * FH * 2);
+  for (const [i, name] of names.entries()) label(image, name, GUTTER + i * cellWidth + 2, 1);
   for (const [i, appearance] of samples.entries()) {
     const y = 7 + i * FH * 2;
     label(image, appearance.species, 2, y + 15);
-    if (key === "weapon") {
+    if (seated) {
+      label(image, "right", 2, y + 24);
+      label(image, "left", 2, y + FH + 24);
+      const table = ROOM_PALETTES.guild_hall;
+      for (const [col, pose] of poses.entries()) {
+        const x = GUTTER + col * cellWidth + (cellWidth - FW) / 2;
+        for (const [row, facing] of [1, -1].entries()) {
+          const floor = y + row * FH + RY;
+          if (key === "write")
+            pasteLayer(
+              image,
+              PROPS.workTable.frames[0]!,
+              table,
+              x + RX + 12 * facing,
+              floor + 2,
+              facing,
+            );
+          pasteLayer(image, PROPS.stool.frames[0]!, table, x + RX - 6 * facing, floor + 2, facing);
+        }
+        renderRow(image, appearance, [pose], x, y, true);
+      }
+    } else if (key === "weapon") {
       renderRow(image, appearance, poses.slice(0, -1), GUTTER, y, true);
       renderRow(image, { ...appearance, weapon: "none" }, [POSE_DEF], GUTTER + 3 * FW, y, true);
     } else {
@@ -251,7 +281,7 @@ const { width, height } = referenceSheets[0]!;
 const referenceImage = makeImage(width, height * presets.length);
 const portImage = makeImage(width, height * presets.length);
 for (const [i, appearance] of presets.entries()) {
-  const sheet = buildSheetFrames(appearance);
+  const sheet = buildSheetFrames(appearance, reference.POSE_NAMES);
   blit(referenceImage, referenceSheets[i]!, 0, i * height);
   blit(
     portImage,
@@ -267,3 +297,52 @@ for (const [i, appearance] of presets.entries()) {
 // Native resolution keeps each pair of rows directly comparable with the HTML's PNG export.
 write("reference", referenceImage);
 write("presets", portImage);
+
+function propSheet(
+  entries: readonly { label: string; frame: PropLayer }[],
+  table: readonly RGB[],
+  columns = 4,
+  cellHeight = 43,
+) {
+  const cellWidth = 68;
+  const image = reviewSheet(columns * cellWidth, Math.ceil(entries.length / columns) * cellHeight);
+  for (const [index, { label: name, frame }] of entries.entries()) {
+    const center = (index % columns) * cellWidth + cellWidth / 2;
+    const floor = Math.floor(index / columns) * cellHeight + cellHeight - 11;
+    pasteLayer(image, frame, table, center, floor);
+    label(image, name, center - name.length * 2, floor + 4);
+  }
+  return scale4(image);
+}
+
+for (const id of Object.keys(ROOM_PROPS) as RoomId[]) {
+  const table = ROOM_PALETTES[id];
+  write(
+    `props-${id}`,
+    propSheet(
+      ROOM_PROPS[id].flatMap((propId) => {
+        const { frames } = PROPS[propId];
+        const name = propId.replace(/[A-Z]/g, (letter) => " " + letter);
+        return frames.map((frame, i) => ({
+          label: frames.length > 1 ? `${name} ${i + 1}` : name,
+          frame,
+        }));
+      }),
+      table,
+    ),
+  );
+  const room = renderRoomReview(id, [samples[2]!, samples[3]!, samples[4]!]);
+  const preview = scale4(room.image);
+  write(`room-${id}`, preview);
+  checkRoomContrast(id, room, preview);
+}
+
+write(
+  "markers",
+  propSheet(
+    Object.entries(MARKERS).map(([name, marker]) => ({ label: name, frame: marker })),
+    MARKER_TABLE,
+    5,
+    23,
+  ),
+);

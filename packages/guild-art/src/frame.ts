@@ -56,19 +56,33 @@ interface StampOptions {
 }
 export const OUT = 1;
 
-export class Layer {
-  d = new Uint8Array(FW * FH);
+export class PropLayer {
+  d: Uint8Array;
   clipped = false;
+
+  readonly width: number;
+  readonly height: number;
+  readonly rootX: number;
+  readonly rootY: number;
+
+  constructor(width: number, height: number, rootX = Math.floor(width / 2), rootY = height) {
+    this.width = width;
+    this.height = height;
+    this.rootX = rootX;
+    this.rootY = rootY;
+    this.d = new Uint8Array(width * height);
+  }
+
   set(x: number, y: number, c: number) {
-    x += RX;
-    y += RY;
-    if (x >= 0 && x < FW && y >= 0 && y < FH) this.d[y * FW + x] = c;
+    x += this.rootX;
+    y += this.rootY;
+    if (x >= 0 && x < this.width && y >= 0 && y < this.height) this.d[y * this.width + x] = c;
     else if (c) this.clipped = true;
   }
   get(x: number, y: number) {
-    x += RX;
-    y += RY;
-    return x >= 0 && x < FW && y >= 0 && y < FH ? this.d[y * FW + x]! : 0;
+    x += this.rootX;
+    y += this.rootY;
+    return x >= 0 && x < this.width && y >= 0 && y < this.height ? this.d[y * this.width + x]! : 0;
   }
   rect(x: number, y: number, w: number, h: number, c: number) {
     for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.set(x + i, y + j, c);
@@ -90,30 +104,38 @@ export class Layer {
     return this;
   }
   outline() {
-    const s = this.d,
-      o = new Uint8Array(s);
+    const { d, height, width } = this;
+    const outlined = d.slice();
     this.clipped ||= this.touchesEdge();
-    for (let y = 0; y < FH; y++)
-      for (let x = 0; x < FW; x++) {
-        const i = y * FW + x;
-        if (s[i]) continue;
-        let hit = false;
-        for (let dy = -1; dy <= 1 && !hit; dy++)
-          for (let dx = -1; dx <= 1; dx++) {
-            if (!dx && !dy) continue;
-            const nx = x + dx,
-              ny = y + dy;
-            if (nx < 0 || ny < 0 || nx >= FW || ny >= FH) continue;
-            if (s[ny * FW + nx]) {
-              hit = true;
-              break;
-            }
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (!d[y * width + x]) continue;
+        for (let ny = Math.max(0, y - 1); ny <= Math.min(height - 1, y + 1); ny++) {
+          for (let nx = Math.max(0, x - 1); nx <= Math.min(width - 1, x + 1); nx++) {
+            const index = ny * width + nx;
+            if (!d[index]) outlined[index] = OUT;
           }
-        if (hit) o[i] = OUT;
+        }
       }
-    this.d = o;
+    }
+    this.d = outlined;
     return this;
   }
+
+  touchesEdge() {
+    for (let x = 0; x < this.width; x++)
+      if (this.d[x] || this.d[(this.height - 1) * this.width + x]) return true;
+    for (let y = 1; y < this.height - 1; y++)
+      if (this.d[y * this.width] || this.d[(y + 1) * this.width - 1]) return true;
+    return false;
+  }
+}
+
+export class Layer extends PropLayer {
+  constructor() {
+    super(FW, FH, RX, RY);
+  }
+
   blit(src: Layer, dx: number, dy: number) {
     this.clipped ||= src.clipped;
     dx = dx | 0;
@@ -166,11 +188,6 @@ export class Layer {
         else l.clipped = true;
       }
     return l;
-  }
-  touchesEdge() {
-    for (let x = 0; x < FW; x++) if (this.d[x] || this.d[(FH - 1) * FW + x]) return true;
-    for (let y = 1; y < FH - 1; y++) if (this.d[y * FW] || this.d[(y + 1) * FW - 1]) return true;
-    return false;
   }
 }
 

@@ -1,4 +1,6 @@
 import { RI, type Pixel, type Point } from "./frame.ts";
+import type { MarkerId } from "./markers.ts";
+import type { HeldItemId } from "./parts/held.ts";
 
 function crescent(
   cx: number,
@@ -49,6 +51,9 @@ export interface Pose {
   readonly cape: number;
   readonly fx: keyof typeof FX | null;
   readonly stow?: boolean;
+  readonly sit?: number;
+  readonly hold?: HeldItemId;
+  readonly marker?: MarkerId;
 }
 
 export const LIFT = 0;
@@ -220,6 +225,24 @@ export const STRIDE = 5;
     });
   }
 })();
+const seated = P({ sit: 3, w: -1, hN: [-4, -5], hF: [4, -5] });
+const writing: Pose = {
+  ...seated,
+  h: [1, 1],
+  sN: [-3, -8],
+  hN: [9, -10],
+  hF: [11, -9],
+  hold: "quill",
+  w: 1,
+};
+Object.assign(POSES, {
+  s0: seated,
+  s1: { ...seated, h: [0, 1] },
+  wr0: writing,
+  wr1: { ...writing, hN: [10, -10] },
+  wr2: { ...writing, h: [1, 0], hN: [8, -11] },
+} satisfies Record<string, Pose>);
+
 export const POSE_NAMES = Object.keys(POSES);
 export const POSE_INDEX: Readonly<Record<string, number>> = Object.fromEntries(
   POSE_NAMES.map((n, i) => [n, i]),
@@ -264,4 +287,6 @@ export const CLIPS = {
     loop: false,
     hit: [2, 6],
   },
+  sit: { name: "sit", f: seq(["s0", "s1"], 260), loop: true },
+  write: { name: "write", f: seq(["wr0", "wr1", "wr2"], [190, 210, 160]), loop: true },
 };

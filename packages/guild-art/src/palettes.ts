@@ -1,4 +1,4 @@
-import { ROLE_CHARS } from "./frame.ts";
+import { ROLE_CHARS, type PropLayer, type Role } from "./frame.ts";
 
 export const FIXED = {
   O: "#241432",
@@ -160,20 +160,31 @@ export const PALETTES = [
     s: "#9a8878",
   },
 ];
-type Palette = (typeof PALETTES)[number];
+type PaletteColors = Readonly<Partial<Record<Role, string>>>;
 export type RGB = readonly [number, number, number];
 
-function hexRGB(h: string): RGB {
+export function hexRGB(h: string): RGB {
   const n = parseInt(h.slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
-export function paletteTable(p: Palette) {
-  const t: RGB[] = [];
-  for (let i = 0; i < ROLE_CHARS.length; i++) {
-    const ch = ROLE_CHARS[i];
-    const hex =
-      ch === "x" ? p.L : p[ch as keyof Palette] || FIXED[ch as keyof typeof FIXED] || "#ff00ff";
-    t.push(i === 0 ? [0, 0, 0] : hexRGB(hex));
+export function paletteTable(p: PaletteColors) {
+  return [...ROLE_CHARS].map((role) => {
+    if (role === ".") return [0, 0, 0] as const;
+    const hex = role === "x" ? p.L : p[role as Role] || FIXED[role as keyof typeof FIXED];
+    return hexRGB(hex || "#ff00ff");
+  });
+}
+
+export function layerToRGBA(layer: PropLayer, table: readonly RGB[]) {
+  const data = new Uint8ClampedArray(layer.d.length * 4);
+  for (const [i, role] of layer.d.entries()) {
+    if (!role) continue;
+    const [r, g, b] = table[role]!;
+    const offset = i * 4;
+    data[offset] = r;
+    data[offset + 1] = g;
+    data[offset + 2] = b;
+    data[offset + 3] = 255;
   }
-  return t;
+  return { width: layer.width, height: layer.height, data };
 }

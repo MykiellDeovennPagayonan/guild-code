@@ -11,18 +11,21 @@ export interface SheetFrames {
   readonly anchors: readonly Anchors[];
 }
 
-export function buildSheetFrames(appearance: Appearance): SheetFrames {
+export function buildSheetFrames(
+  appearance: Appearance,
+  names: readonly string[] = POSE_NAMES,
+): SheetFrames {
   const parts = buildParts(appearance);
   const frames: Uint8Array[] = [];
   const mirrored: Uint8Array[] = [];
   const anchors: Anchors[] = [];
-  for (const name of POSE_NAMES) {
+  for (const name of names) {
     const frame = composeFrame(parts, POSES[name]!);
     frames.push(frame.layer.d);
     mirrored.push(frame.layer.mirrored().d);
     anchors.push(frame.anchors);
   }
-  return { poses: [...POSE_NAMES], frames, mirrored, anchors };
+  return { poses: [...names], frames, mirrored, anchors };
 }
 
 export function toRGBA(sheet: Pick<SheetFrames, "frames" | "mirrored">, table: readonly RGB[]) {
