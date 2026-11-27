@@ -218,7 +218,7 @@ function RootRouteBranch() {
   const appShell = (
     <CommandPalette>
       {/* Setup starts with an empty workspace, so the Welcome page has no thread list. */}
-      <AppSidebarLayout showSidebar={!isWelcome}>
+      <AppSidebarLayout showSidebar={!isWelcome && pathname !== "/guild"}>
         <Outlet />
       </AppSidebarLayout>
     </CommandPalette>

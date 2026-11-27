@@ -610,6 +610,11 @@ export default defineConfig({
         rules: { "t3code/no-untranslated-copy": "error" },
       },
       {
+        // Guild copy is English only (U-006).
+        files: ["apps/web/src/guild/**"],
+        rules: { "t3code/no-untranslated-copy": "off" },
+      },
+      {
         // React Compiler owns memoization; upstream rules do not ban redundant useMemo/useCallback.
         files: ["apps/web/src/**/*.{ts,tsx}"],
         rules: {
