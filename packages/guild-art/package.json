@@ -15,13 +15,33 @@
       "types": "./src/frame.ts",
       "import": "./src/frame.ts"
     },
+    "./markers": {
+      "types": "./src/markers.ts",
+      "import": "./src/markers.ts"
+    },
     "./palettes": {
       "types": "./src/palettes.ts",
       "import": "./src/palettes.ts"
     },
+    "./parts/registry": {
+      "types": "./src/parts/registry.ts",
+      "import": "./src/parts/registry.ts"
+    },
     "./poses": {
       "types": "./src/poses.ts",
       "import": "./src/poses.ts"
+    },
+    "./props": {
+      "types": "./src/props/index.ts",
+      "import": "./src/props/index.ts"
+    },
+    "./props/palettes": {
+      "types": "./src/props/palettes.ts",
+      "import": "./src/props/palettes.ts"
+    },
+    "./props/tiles": {
+      "types": "./src/props/tiles.ts",
+      "import": "./src/props/tiles.ts"
     },
     "./random": {
       "types": "./src/random.ts",
@@ -30,10 +50,6 @@
     "./sheet": {
       "types": "./src/sheet.ts",
       "import": "./src/sheet.ts"
-    },
-    "./parts/registry": {
-      "types": "./src/parts/registry.ts",
-      "import": "./src/parts/registry.ts"
     }
   },
   "scripts": {

@@ -10,8 +10,9 @@ import { loadReference } from "./reference.ts";
 
 it("matches the three presets and 200 seeded configurations in every reference pose", () => {
   const { reference } = loadReference();
-  expect(POSE_NAMES).toEqual(reference.POSE_NAMES);
-  expect(CLIPS).toEqual(reference.CLIPS);
+  expect(POSE_NAMES.slice(0, reference.POSE_NAMES.length)).toEqual(reference.POSE_NAMES);
+  const { sit: _sit, write: _write, ...referenceClips } = CLIPS;
+  expect(referenceClips).toEqual(reference.CLIPS);
   expect(
     CATS.map(({ key, list, referenceCount }) => ({
       key,
@@ -61,7 +62,7 @@ it("matches all eight palette tables and the RGBA bytes of each preset PNG expor
   }
   for (const cfg of reference.PRESETS) {
     const data = toRGBA(
-      buildSheetFrames(reference.toJSON(cfg)),
+      buildSheetFrames(reference.toJSON(cfg), reference.POSE_NAMES),
       paletteTable(PALETTES[cfg.palette]!),
     );
     expect(

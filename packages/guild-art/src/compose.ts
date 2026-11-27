@@ -1,5 +1,7 @@
 import type { Appearance } from "./appearance.ts";
 import { Layer, RI, RX, RY, dilate, widen, type Point } from "./frame.ts";
+import { markerAbove } from "./markers.ts";
+import { HELD_ITEMS } from "./parts/held.ts";
 import { getPart } from "./parts/registry.ts";
 import { REFERENCE_WEAPON_COUNT, WEAPONS } from "./parts/weapons.ts";
 import { FX, LIFT, POSE_DEF, type Foot, type Pose } from "./poses.ts";
@@ -132,14 +134,27 @@ export function armLayer(
   if (near && o.pad) l.put(o.pad, sx, sy);
   return l.outline();
 }
-export function legLayer(parts: Parts, hipX: number, hipY: number, foot: Foot) {
+export function legLayer(parts: Parts, hipX: number, hipY: number, foot: Foot, seated = false) {
   const l = new Layer(),
     c = RI[parts.outfit.leg];
   const topY = foot[1] - 1;
-  for (let y = hipY + 1; y < topY; y++) {
-    const t = (y - hipY) / (topY - hipY);
-    const x = Math.round(hipX + (foot[0] - hipX) * t);
-    l.rect(x - 1, y, 2, 1, c);
+  if (seated) {
+    const kneeX = foot[0] + 1;
+    const kneeY = Math.min(hipY, topY - 1);
+    const thighY = Math.min(hipY - 1, topY);
+    const thigh = Math.max(1, Math.abs(kneeX - hipX));
+    for (let step = 0; step <= thigh; step++) {
+      const x = Math.round(hipX + ((kneeX - hipX) * step) / thigh);
+      const y = Math.round(thighY + ((kneeY - thighY) * step) / thigh);
+      l.rect(x - 1, y, 2, 2, c);
+    }
+    l.rect(foot[0], kneeY + 1, 2, topY - kneeY, c);
+  } else {
+    for (let y = hipY + 1; y < topY; y++) {
+      const t = (y - hipY) / (topY - hipY);
+      const x = Math.round(hipX + (foot[0] - hipX) * t);
+      l.rect(x - 1, y, 2, 1, c);
+    }
   }
   l.put(parts.boots.v[foot[2]], foot[0], foot[1], { map: parts.legMap });
   return l.outline();
@@ -156,10 +171,10 @@ export interface Anchors {
   readonly footF: Foot;
 }
 
-export function composeFrame(parts: Parts, pose: Pose): { layer: Layer; anchors: Anchors } {
+export function composeFrame(parts: Parts, pose: Pose) {
   const out = new Layer();
   const bx = pose.b[0],
-    by = pose.b[1] + LIFT;
+    by = pose.b[1] + LIFT + (pose.sit ?? 0);
   const hx = bx + pose.h[0],
     hy = by - 10 + pose.h[1];
   const B = parts.build,
@@ -168,27 +183,49 @@ export function composeFrame(parts: Parts, pose: Pose): { layer: Layer; anchors:
     fH: Point = [bx + pose.hF[0] + B, by + pose.hF[1]];
   const nS: Point = [bx + pose.sN[0] - nB, by + pose.sN[1]],
     fS: Point = [bx + pose.sF[0] + B, by + pose.sF[1]];
-  const fN: Foot = [pose.fN[0] - B, pose.fN[1], pose.fN[2]],
-    fF: Foot = [pose.fF[0] + B, pose.fF[1], pose.fF[2]];
+  const seated = pose.sit !== undefined;
+  const forward = seated ? 5 : 0;
+  const fN: Foot = [pose.fN[0] - B + forward, pose.fN[1], pose.fN[2]],
+    fF: Foot = [pose.fF[0] + B + forward, pose.fF[1], pose.fF[2]];
   const bk = parts.backs[Math.min(parts.backs.length - 1, parts.back.pick(pose.cape))]!;
   const back: Point = [bx - 5 - B, by - 8];
   out.blit(bk, bx - B, by); // back accessory
   if (parts.tail) out.blit(parts.tail, bx - B, by); // species tail
   out.blit(parts.headFar, hx, hy); // long hair behind the body
   if (parts.behind) out.blit(parts.behind, bx, by);
-  const wl = pose.w === -1 || pose.stow ? undefined : parts.weap[pose.w];
-  if (pose.stow && pose.w !== -1) out.blit(parts.stowedWeapon, back[0], back[1] - STOW_Y);
+  const wl =
+    pose.w === -1
+      ? undefined
+      : pose.hold
+        ? HELD_ITEMS[pose.hold][pose.w]
+        : pose.stow
+          ? undefined
+          : parts.weap[pose.w];
+  if (pose.stow && !pose.hold && pose.w !== -1)
+    out.blit(parts.stowedWeapon, back[0], back[1] - STOW_Y);
   else if (wl && !pose.wz) out.blit(wl, nH[0], nH[1]);
   out.blit(armLayer(parts, fS[0], fS[1], fH[0], fH[1], false), 0, 0); // far arm
-  out.blit(legLayer(parts, bx + 2 + B, by - 5, fF), 0, 0); // far leg
-  out.blit(legLayer(parts, bx - 2 - B, by - 5, fN), 0, 0); // near leg
-  out.blit(parts.torso, bx, by); // torso
+  out.blit(legLayer(parts, bx + 2 + B, by - 5, fF, seated), 0, 0);
+  const nearLeg = legLayer(parts, bx - 2 - B, by - 5, fN, seated);
+  if (!seated) out.blit(nearLeg, 0, 0);
+  out.blit(parts.torso, bx, by);
+  if (seated) out.blit(nearLeg, 0, 0);
   out.blit(parts.headL, hx, hy); // hat back + head + face + hat front
   if (pose.fx) out.put(FX[pose.fx], 0, 0); // slash
   if (wl && pose.wz) out.blit(wl, nH[0], nH[1]); // weapon
   out.blit(armLayer(parts, nS[0], nS[1], nH[0], nH[1], true), 0, 0); // near arm + hand over the grip
+  const anchors: Anchors = {
+    root: [0, 0],
+    head: [hx, hy],
+    handN: nH,
+    handF: fH,
+    back,
+    footN: fN,
+    footF: fF,
+  };
   return {
     layer: out,
-    anchors: { root: [0, 0], head: [hx, hy], handN: nH, handF: fH, back, footN: fN, footF: fF },
+    anchors,
+    marker: pose.marker && markerAbove(pose.marker, out, anchors.head),
   };
 }

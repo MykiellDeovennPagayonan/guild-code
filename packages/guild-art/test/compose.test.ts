@@ -3,18 +3,27 @@ import { expect, it } from "vite-plus/test";
 import { DEFAULT_APPEARANCE } from "../src/appearance.ts";
 import { buildParts, composeFrame } from "../src/compose.ts";
 import { Layer } from "../src/frame.ts";
+import { MARKERS, type MarkerId } from "../src/markers.ts";
 import { getPart } from "../src/parts/registry.ts";
 import { POSES, POSE_DEF } from "../src/poses.ts";
 import { randomAppearance, seededRng } from "../src/random.ts";
 
 it("composes 2,000 seeded appearances through every pose without clipping", () => {
   const rng = seededRng(2438);
+  const markerIds = Object.keys(MARKERS) as MarkerId[];
   for (let i = 0; i < 2_000; i++) {
     const random = randomAppearance(rng);
     const appearance = i % 5 === 0 ? { ...random, weapon: "none" } : random;
     const parts = buildParts(appearance);
     for (const [name, pose] of Object.entries(POSES)) {
-      const { layer } = composeFrame(parts, pose);
+      const markerId = markerIds[i % markerIds.length]!;
+      const { layer, marker } = composeFrame(
+        parts,
+        pose.sit === undefined ? pose : { ...pose, marker: markerId },
+      );
+      if (pose.sit !== undefined) {
+        NodeAssert.equal(marker?.layer.clipped, false, `sample ${i}, ${name}, ${markerId}`);
+      }
       NodeAssert.equal(layer.mirrored().clipped, false, `sample ${i}, ${name}`);
       NodeAssert.equal(
         composeFrame(parts, { ...pose, stow: true }).layer.mirrored().clipped,
@@ -67,4 +76,24 @@ it("replays the seed and keeps locked choices, including the no-weapon choice", 
     expect(randomAppearance(rng).weapon).not.toBe("none");
     randomAppearance(replay);
   }
+});
+
+it("lowers the seated hips, advances planted feet, and replaces the weapon with a quill", () => {
+  const parts = buildParts(DEFAULT_APPEARANCE);
+  const idle = composeFrame(parts, POSE_DEF);
+  const sit = composeFrame(parts, POSES.s0!);
+  const breath = composeFrame(parts, POSES.s1!);
+  expect(sit.anchors.head[1]).toBe(idle.anchors.head[1] + POSES.s0!.sit!);
+  expect(sit.anchors.footN[0]).toBeGreaterThan(idle.anchors.footN[0]);
+  expect(sit.anchors.footN[1]).toBe(idle.anchors.footN[1]);
+  expect(breath.anchors.footN).toEqual(sit.anchors.footN);
+  expect(breath.anchors.head[1]).toBe(sit.anchors.head[1] + 1);
+
+  const withoutWeapon = buildParts({ ...DEFAULT_APPEARANCE, weapon: "none" });
+  expect(composeFrame(withoutWeapon, POSES.s0!).layer.d).toEqual(sit.layer.d);
+  const pose = POSES.wr0!;
+  const write = composeFrame(parts, pose);
+  expect(composeFrame(withoutWeapon, pose).layer.d).toEqual(write.layer.d);
+  expect(composeFrame(parts, { ...pose, w: -1 }).layer.d).not.toEqual(write.layer.d);
+  expect(composeFrame(parts, POSES.wr1!).anchors.handN).not.toEqual(write.anchors.handN);
 });
