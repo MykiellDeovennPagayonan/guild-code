@@ -56,6 +56,8 @@ Entries are never deleted. A superseded entry gets `Superseded by D-NNN` and sta
 | D-026 | Guild offers JSON export of its own tables (`guild.export`, Increment 4); the SQLite database is backed up with T3's storage tools; no import in v1. | Brief §13 lists "backup/export" under persistence. | [02](implementation/02_domain-model.md) §Stream |
 | D-027 | Quest and attempt state values use T3's spelling `cancelled`. Verbatim brief quotes keep the brief's "canceled". | One spelling in code; quotes stay verbatim. | [08](implementation/08_quest-lifecycle.md) |
 
+| D-028 | **MVP scope** (developer approved 2026-11-27, details delegated to the orchestrator): build Increment 1 trimmed as listed in [tasks/increment-1.md §MVP scope](implementation/tasks/increment-1.md#mvp-scope). Deferred items stay in the spec and are built afterwards. Give orders offers project root (default) or a new worktree. | First usable end-to-end loop with the least code. | [increment-1](implementation/tasks/increment-1.md) |
+
 ## Unsupported or partly supported (brief §15: "explicitly report any unsupported feature instead of faking it")
 
 | Brief asks for | Status | Why | What Guild does instead |

@@ -4,6 +4,29 @@
 
 **Done when** every card's checks pass and the integrated pass in T1.12 demonstrates ACC-VIS, ACC-NAV, ACC-REC, ACC-PROV, ACC-LIVE (Increment 1 parts), ACC-ENG (via focus mode) and ACC-RECOV (identity).
 
+## MVP scope
+
+Decision D-028. The MVP is the first build. It is Increment 1 with these cuts; everything cut stays in the cards and is built after the MVP.
+
+**The MVP loop (all real):** create the Guild Master → walk the Guild Hall → E at the door → Recruitment Hall → hire one of 4 random candidates (class, provider, model family; Level 0) → back in the Hall, E on the adventurer → Give orders (project, message, project root or new worktree) → a real T3 thread starts on the bound model with the visible Guild briefing → the NPC sits at a work table while working, shows approval/question markers, shows offline when disconnected → HUD "Needs you" or "Open conversation" opens the thread in focus mode → server restart keeps everything → an unavailable family refuses with the reason.
+
+| Card | In the MVP | Deferred |
+|---|---|---|
+| T1.1 | Light: confirm the app runs and record pre-existing check failures | Full workflow walk-through |
+| T1.2 | All except worker use | — |
+| T1.3 | Parts, prev/next, option grid, shuffle, locks, idle preview, name, save, edit later | Share codes UI, JSON, PNG download, presets, clip buttons and transport |
+| T1.4 | All except the physics parity browser test (movement ported exactly and checked by hand) and the `report:client` baseline | Parity browser test, client metrics baseline, debug overlay |
+| T1.5 | Guild Hall and Recruitment Hall with one door pair; props for both; saved location | Barracks and Corridor scenes |
+| T1.6 | All | — |
+| T1.7 | All | — |
+| T1.8 | Roster overlay opened from the HUD (list + profile read-only: name, class, family, attempts) | Barracks room, edits, archive/restore UI (the server still records `hired` changes) |
+| T1.9 | All except the drift warning UI (drift is still recorded) | Drift UI |
+| T1.10 | Coarse live states; `sit` and `write` poses; attention/approval/question/offline markers; NPCs placed directly (run clip for any movement) | Walk clip, held items, cross-scene walking |
+| T1.11 | HUD (Active, Needs you, Connection), palette "Open Guild" and adventurer search, `guild.toggle` | Hybrid mode, fast travel, focus-mode chip |
+| T1.12 | Mode-switch safety check and the integrated pass on the MVP loop | — |
+
+Sheets are built on the main thread during idle time in the MVP (03 §Failure and reverse states' fallback); the worker comes later.
+
 ## Card format
 
 Each card lists: **Goal**, **Requirements** (IDs in [traceability.md](../../traceability.md)), **Read first**, **Depends on**, **Owns** (files/dirs only this card edits while it's in flight), **Steps**, **Checks** (each needs evidence in the report, [agent-rules.md](../../agent-rules.md) §7).
