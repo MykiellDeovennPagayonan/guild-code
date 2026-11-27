@@ -21,6 +21,7 @@ import {
 } from "./orchestrationV2.ts";
 import { ProviderInstanceId } from "./providerInstance.ts";
 import { ProviderInteractionMode, RuntimeMode } from "./providerPolicy.ts";
+import { TurnTokenUsage } from "./providerRuntime.ts";
 
 export const GuildAdventurerId = TrimmedNonEmptyString.pipe(Schema.brand("GuildAdventurerId"));
 export type GuildAdventurerId = typeof GuildAdventurerId.Type;
@@ -234,7 +235,7 @@ export const AttemptTurn = Schema.Struct({
   status: OrchestrationV2ProviderTurn.fields.status,
   requestedModel: TrimmedNonEmptyString,
   executedModel: Schema.NullOr(TrimmedNonEmptyString),
-  turnTokenUsage: Schema.NullOr(Schema.Json),
+  turnTokenUsage: Schema.NullOr(TurnTokenUsage),
   errorClass: Schema.NullOr(OrchestrationV2ProviderFailureClass),
   startedAt: Schema.NullOr(timestamp),
   endedAt: Schema.NullOr(timestamp),
@@ -339,10 +340,74 @@ export class GuildPersistenceError extends Schema.TaggedError<GuildPersistenceEr
   }
 }
 
+export class GuildAppearanceError extends Schema.TaggedError<GuildAppearanceError>()(
+  "GuildAppearanceError",
+  {},
+) {
+  override get message() {
+    return "The appearance includes an invalid part.";
+  }
+}
+
+export class GuildCandidateGoneError extends Schema.TaggedError<GuildCandidateGoneError>()(
+  "GuildCandidateGoneError",
+  { code: Schema.Literal("candidate_gone") },
+) {
+  override get message() {
+    return "This candidate is no longer in the recruitment pool.";
+  }
+}
+
+export class GuildBindingError extends Schema.TaggedError<GuildBindingError>()(
+  "GuildBindingError",
+  {
+    code: Schema.Literals([
+      "provider_unavailable",
+      "pinned_model_unavailable",
+      "family_unavailable",
+      "option_unavailable",
+    ]),
+    reason: TrimmedNonEmptyString,
+  },
+) {
+  override get message() {
+    return this.reason;
+  }
+}
+
+export class GuildConversationError extends Schema.TaggedError<GuildConversationError>()(
+  "GuildConversationError",
+  {
+    code: Schema.Literals([
+      "adventurer_unavailable",
+      "project_unavailable",
+      "conversation_already_open",
+      "conversation_not_active",
+    ]),
+  },
+) {
+  override get message() {
+    switch (this.code) {
+      case "adventurer_unavailable":
+        return "Choose an active adventurer.";
+      case "project_unavailable":
+        return "The project is unavailable.";
+      case "conversation_already_open":
+        return "Open or end the adventurer's current conversation first.";
+      case "conversation_not_active":
+        return "This conversation is no longer active.";
+    }
+  }
+}
+
 export const GuildCommandRejection = Schema.Union([
   GuildMasterAlreadyExistsError,
   GuildMasterMissingError,
   GuildNotImplementedError,
+  GuildAppearanceError,
+  GuildCandidateGoneError,
+  GuildBindingError,
+  GuildConversationError,
 ]);
 export type GuildCommandRejection = typeof GuildCommandRejection.Type;
 

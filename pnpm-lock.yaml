@@ -907,6 +907,12 @@ importers:
       '@muse-code/sdk':
         specifier: 1.4.6
         version: 1.4.6(patch_hash=7b495b607fc5d76b444c7c4d58821e839726a30e6f3c53564f0d59f2d5b42101)(@types/node@24.12.4)
+      '@t3tools/guild-art':
+        specifier: workspace:*
+        version: link:../../packages/guild-art
+      '@t3tools/guild-core':
+        specifier: workspace:*
+        version: link:../../packages/guild-core
       '@t3tools/issue-tracker-jira':
         specifier: workspace:*
         version: link:../../packages/issue-tracker-jira
@@ -1686,6 +1692,13 @@ importers:
   packages/guild-art: {}
 
   packages/guild-core:
+    dependencies:
+      '@t3tools/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@t3tools/guild-art':
+        specifier: workspace:*
+        version: link:../guild-art
     devDependencies:
       vite-plus:
         specifier: 1.8.0

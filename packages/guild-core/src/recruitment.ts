@@ -1,4 +1,7 @@
+import { randomAppearance } from "@t3tools/guild-art/random";
+
 import { generateCandidateName } from "./names.ts";
+import { seededRandom } from "./random.ts";
 
 interface CandidatePool {
   readonly seed: string;
@@ -21,4 +24,11 @@ export function visibleCandidateNames(pool: CandidatePool, activeNames: Iterable
     taken.add(name);
     return { index, name };
   });
+}
+
+export function generateCandidate(seed: string, index: number, takenNames: Iterable<string>) {
+  return {
+    name: generateCandidateName(seed, index, takenNames),
+    appearance: randomAppearance(seededRandom(JSON.stringify([seed, index, "appearance"]))),
+  };
 }
