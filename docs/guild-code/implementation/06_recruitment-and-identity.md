@@ -50,18 +50,18 @@ VIS-03, PIL-01, PIL-05, NAV-01, NAV-03, ART-05, REC-01…REC-08, PRO-01…PRO-05
 
 Talking to a candidate (E or click) opens the **hiring overlay**:
 
-| Field | Required | Source / rule |
-|---|---|---|
-| Class | yes | Picker of the nine classes (§Classes). Preselects nothing (CLS-02). |
-| Provider | yes | T3 provider instances that are enabled and authenticated (`ServerProvider.status`, `auth`). Unavailable ones are listed disabled with their reason. |
-| Model family | yes | Families derived from that instance's discovered models (§Families). |
-| Pin a model | no | One model slug within the family; default unpinned. |
-| Reasoning effort | if supported | Values from the model's `role: "reasoning"` option descriptor (`packages/contracts/src/model.ts:24-35`); hidden if the model has none. |
-| Permission policy | yes | T3 runtime mode, preselected from the class default (§Classes); the user may lower or raise it. Shown with T3's own labels (Supervised, Auto-accept edits, Auto, Full access). |
-| Interaction mode | yes | `default` or `plan`, class default preselected. |
-| Specialties | no | Free tags, e.g. "postgres", "react". |
-| Instructions | no | Textarea prefilled with the class's role template (§Classes), editable. |
-| Approved tools | — (shown, not edited, in Increment 1) | A read-only "Tools" line that states what really applies: "Provider tools as configured in T3 for *<instance>*, under the permission policy above." Increment 3 adds Guild tools by role (09); Increment 5 adds the loadout (12). |
+| Field             | Required                              | Source / rule                                                                                                                                                                                                                     |
+| ----------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Class             | yes                                   | Picker of the nine classes (§Classes). Preselects nothing (CLS-02).                                                                                                                                                               |
+| Provider          | yes                                   | T3 provider instances that are enabled and authenticated (`ServerProvider.status`, `auth`). Unavailable ones are listed disabled with their reason.                                                                               |
+| Model family      | yes                                   | Families derived from that instance's discovered models (§Families).                                                                                                                                                              |
+| Pin a model       | no                                    | One model slug within the family; default unpinned.                                                                                                                                                                               |
+| Reasoning effort  | if supported                          | Values from the model's `role: "reasoning"` option descriptor (`packages/contracts/src/model.ts:24-35`); hidden if the model has none.                                                                                            |
+| Permission policy | yes                                   | T3 runtime mode, preselected from the class default (§Classes); the user may lower or raise it. Shown with T3's own labels (Supervised, Auto-accept edits, Auto, Full access).                                                    |
+| Interaction mode  | yes                                   | `default` or `plan`, class default preselected.                                                                                                                                                                                   |
+| Specialties       | no                                    | Free tags, e.g. "postgres", "react".                                                                                                                                                                                              |
+| Instructions      | no                                    | Textarea prefilled with the class's role template (§Classes), editable.                                                                                                                                                           |
+| Approved tools    | — (shown, not edited, in Increment 1) | A read-only "Tools" line that states what really applies: "Provider tools as configured in T3 for _<instance>_, under the permission policy above." Increment 3 adds Guild tools by role (09); Increment 5 adds the loadout (12). |
 
 "Hire" calls `guild.hireAdventurer({ commandId, pool: { seed, index }, classId, binding, defaults, specialties, instructions })`. The server:
 
@@ -73,19 +73,19 @@ The new adventurer walks out of the Recruitment Hall into the Guild Hall (cosmet
 
 ### Classes (CLS-01…CLS-03)
 
-Class is a specialty label with default instructions and a default posture. It never grants permissions (T3-07). "Default posture" from the brief maps onto what T3 can actually enforce: the runtime mode (approval policy), the interaction mode, and the workspace strategy used for quests (08, 10). T3 has no per-tool allowlist and no general read-only sandbox (00 §6), so "read-only by default" means *every write or command needs the user's approval*, plus a read-only snapshot workspace for review quests.
+Class is a specialty label with default instructions and a default posture. It never grants permissions (T3-07). "Default posture" from the brief maps onto what T3 can actually enforce: the runtime mode (approval policy), the interaction mode, and the workspace strategy used for quests (08, 10). T3 has no per-tool allowlist and no general read-only sandbox (00 §6), so "read-only by default" means _every write or command needs the user's approval_, plus a read-only snapshot workspace for review quests.
 
-| Class | Primary work (brief) | Default runtime mode | Default interaction | Quest workspace default | Emblem |
-|---|---|---|---|---|---|
-| Warrior | Feature implementation, refactoring, frontend/backend changes | `auto-accept-edits` | `default` | `own_worktree` | crossed swords |
-| Ranger | Bug reproduction, root-cause analysis, targeted fixes | `approval-required` | `default` | `own_worktree` | bow |
-| Scout | Repository exploration, dependency tracing, technical research | `approval-required` | `default` | `read_only_snapshot` | spyglass |
-| Mage | Code review, architecture, performance and logical analysis | `approval-required` | `default` | `read_only_snapshot` | staff |
-| Cleric | Test creation/execution, E2E, integration, regression, independent verification | `approval-required` | `default` | `own_worktree` | chalice |
-| Paladin | Security, auth, authorization, data integrity, threat modeling | `approval-required` | `default` | `read_only_snapshot` | shield |
-| Artificer | Infrastructure, Docker, CI/CD, migrations, deployment preparation | `approval-required` | `default` | `own_worktree` | cog |
-| Scribe | Documentation, ADRs, changelogs, project knowledge | `auto-accept-edits` | `default` | `own_worktree` | quill |
-| Commander | Mission planning, decomposition, scheduling and integration | `approval-required` | `plan` | `mission_branch` | banner |
+| Class     | Primary work (brief)                                                            | Default runtime mode | Default interaction | Quest workspace default | Emblem         |
+| --------- | ------------------------------------------------------------------------------- | -------------------- | ------------------- | ----------------------- | -------------- |
+| Warrior   | Feature implementation, refactoring, frontend/backend changes                   | `auto-accept-edits`  | `default`           | `own_worktree`          | crossed swords |
+| Ranger    | Bug reproduction, root-cause analysis, targeted fixes                           | `approval-required`  | `default`           | `own_worktree`          | bow            |
+| Scout     | Repository exploration, dependency tracing, technical research                  | `approval-required`  | `default`           | `read_only_snapshot`    | spyglass       |
+| Mage      | Code review, architecture, performance and logical analysis                     | `approval-required`  | `default`           | `read_only_snapshot`    | staff          |
+| Cleric    | Test creation/execution, E2E, integration, regression, independent verification | `approval-required`  | `default`           | `own_worktree`          | chalice        |
+| Paladin   | Security, auth, authorization, data integrity, threat modeling                  | `approval-required`  | `default`           | `read_only_snapshot`    | shield         |
+| Artificer | Infrastructure, Docker, CI/CD, migrations, deployment preparation               | `approval-required`  | `default`           | `own_worktree`          | cog            |
+| Scribe    | Documentation, ADRs, changelogs, project knowledge                              | `auto-accept-edits`  | `default`           | `own_worktree`          | quill          |
+| Commander | Mission planning, decomposition, scheduling and integration                     | `approval-required`  | `plan`              | `mission_branch`        | banner         |
 
 The workspace values are the `Quest.workspace.strategy` values from 02.
 
@@ -98,9 +98,9 @@ Changing class later is allowed from the profile; it logs `class_changed` and ne
 ```ts
 type ModelBinding = {
   providerInstanceId: ProviderInstanceId;
-  family: { key: string; label: string };   // e.g. { key: "claudeAgent:sonnet", label: "Sonnet" }
-  pinnedModel: string | null;               // a model slug in the family, or null
-  options: Record<string, string> | null;   // e.g. { effort: "high" }; validated against capabilities
+  family: { key: string; label: string }; // e.g. { key: "claudeAgent:sonnet", label: "Sonnet" }
+  pinnedModel: string | null; // a model slug in the family, or null
+  options: Record<string, string> | null; // e.g. { effort: "high" }; validated against capabilities
 };
 ```
 
@@ -130,7 +130,7 @@ Guild **always** passes this explicit selection to `ThreadLaunchService.launch` 
 
 #### Unavailable family (MOD-03)
 
-A binding error stops the launch. The attempt is not created (or is marked `failed` with the error if the error appears after commit). The UI shows the reason in the dialogue and profile, e.g. "Sonnet isn't offered by provider *Claude (work)* right now: not signed in." with actions:
+A binding error stops the launch. The attempt is not created (or is marked `failed` with the error if the error appears after commit). The UI shows the reason in the dialogue and profile, e.g. "Sonnet isn't offered by provider _Claude (work)_ right now: not signed in." with actions:
 
 - **Fix the provider** (opens T3 provider settings).
 - **Change binding…** (opens the binding editor; saving logs `binding_changed` with before/after and requires a confirmation that names the old and new family).

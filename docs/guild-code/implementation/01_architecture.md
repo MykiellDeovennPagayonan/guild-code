@@ -92,29 +92,29 @@ Details of tables, history and idempotency are in [02_domain-model.md](02_domain
 
 Guild runs real provider work by launching and messaging ordinary T3 threads:
 
-| Guild action | T3 mechanism | Precedent |
-|---|---|---|
-| Talk to an adventurer / "give orders" (Increment 1) | Launch a thread with the adventurer's bound provider instance and model; later messages go to the same thread | `ThreadLaunchService.launch` as used by `WorkflowAgentThreads.ts:209-224` and `ScheduledTaskService.ts:1126-1150` |
-| Mission (Increment 2) | One primary thread, created with the mission (T3-03) | — |
-| Quest attempt (Increment 2–3) | A new thread per attempt, launched by Guild (app-level orchestration, T3-06), linked to the mission and quest by Guild's own tables | Workflows launch step threads the same way |
-| Party leader delegating (Increment 3) | The leader's thread calls **Guild MCP tools** (propose quests, assign, report); Guild's scheduler launches member threads. The leader does not call `delegate_task` directly for Guild work | `apps/server/src/mcp/toolkits/*` |
-| Cancel / pause | T3 interrupt and stop on the linked thread | `task_cancel` path in `OrchestratorMcpService.ts:3119-3330` |
+| Guild action                                        | T3 mechanism                                                                                                                                                                                | Precedent                                                                                                         |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Talk to an adventurer / "give orders" (Increment 1) | Launch a thread with the adventurer's bound provider instance and model; later messages go to the same thread                                                                               | `ThreadLaunchService.launch` as used by `WorkflowAgentThreads.ts:209-224` and `ScheduledTaskService.ts:1126-1150` |
+| Mission (Increment 2)                               | One primary thread, created with the mission (T3-03)                                                                                                                                        | —                                                                                                                 |
+| Quest attempt (Increment 2–3)                       | A new thread per attempt, launched by Guild (app-level orchestration, T3-06), linked to the mission and quest by Guild's own tables                                                         | Workflows launch step threads the same way                                                                        |
+| Party leader delegating (Increment 3)               | The leader's thread calls **Guild MCP tools** (propose quests, assign, report); Guild's scheduler launches member threads. The leader does not call `delegate_task` directly for Guild work | `apps/server/src/mcp/toolkits/*`                                                                                  |
+| Cancel / pause                                      | T3 interrupt and stop on the linked thread                                                                                                                                                  | `task_cancel` path in `OrchestratorMcpService.ts:3119-3330`                                                       |
 
 `GuildRunBridge` watches T3's domain events for threads it launched (the same way `DelegatedTaskQuestionReactor` listens, `DelegatedTaskQuestionReactor.ts:250-275`) and records into Guild's tables what Guild must keep permanently: run status transitions, the exact model used, token usage when available, errors, and completion. Because T3's event log expires after a day, anything Guild needs for history is copied into Guild's run record when it happens.
 
 ### Module layout and ownership (decision D-001)
 
-| Path | Contains | Notes |
-|---|---|---|
-| `packages/guild-art/` | Sprite system, parts, poses, props, appearance codec, PNG render script | Pure, no DOM. See [03](03_sprite-system.md). |
-| `packages/guild-core/` | State machines, name generator, family resolution helpers, XP rules, presentation policy, dependency graph | Pure, no I/O, no Effect services. Used by server and web. Subpath exports, no barrel, like `packages/shared`. |
-| `packages/contracts/src/guild.ts` (+ `guildRpc.ts` if large) | Effect Schemas for Guild entities, commands, stream items, RPC group | Wire changes only here (root AGENTS.md *Contracts*). |
-| `packages/client-runtime/src/state/guild.ts` | Guild stream atoms and `createEnvironmentRpcCommand` commands | Mobile won't use it, but shared client state belongs here per repo convention. |
-| `apps/server/src/guild/` | `GuildStore`, `GuildService`, `GuildRunBridge`, later `GuildScheduler`, `GuildEvidence` | Effect services with `Effect.fn("GuildService.operation")`. Thin RPC handlers in `ws.ts`. |
-| `apps/server/src/persistence/Migrations/120_Guild*.ts` … | Guild tables | Registered in `persistence/Migrations.ts`. |
-| `apps/server/src/mcp/toolkits/guild/` | Guild MCP tools (Increment 3) | Follow `McpToolAccess` declarations; evals required. |
-| `apps/web/src/guild/` | Engine, world, overlays, render, presentation | Non-React engine classes; React only for overlays and the host component. |
-| `apps/web/src/routes/_chat.guild.tsx` | The Guild route | See [13](13_presentation-modes.md). |
+| Path                                                         | Contains                                                                                                   | Notes                                                                                                         |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `packages/guild-art/`                                        | Sprite system, parts, poses, props, appearance codec, PNG render script                                    | Pure, no DOM. See [03](03_sprite-system.md).                                                                  |
+| `packages/guild-core/`                                       | State machines, name generator, family resolution helpers, XP rules, presentation policy, dependency graph | Pure, no I/O, no Effect services. Used by server and web. Subpath exports, no barrel, like `packages/shared`. |
+| `packages/contracts/src/guild.ts` (+ `guildRpc.ts` if large) | Effect Schemas for Guild entities, commands, stream items, RPC group                                       | Wire changes only here (root AGENTS.md _Contracts_).                                                          |
+| `packages/client-runtime/src/state/guild.ts`                 | Guild stream atoms and `createEnvironmentRpcCommand` commands                                              | Mobile won't use it, but shared client state belongs here per repo convention.                                |
+| `apps/server/src/guild/`                                     | `GuildStore`, `GuildService`, `GuildRunBridge`, later `GuildScheduler`, `GuildEvidence`                    | Effect services with `Effect.fn("GuildService.operation")`. Thin RPC handlers in `ws.ts`.                     |
+| `apps/server/src/persistence/Migrations/120_Guild*.ts` …     | Guild tables                                                                                               | Registered in `persistence/Migrations.ts`.                                                                    |
+| `apps/server/src/mcp/toolkits/guild/`                        | Guild MCP tools (Increment 3)                                                                              | Follow `McpToolAccess` declarations; evals required.                                                          |
+| `apps/web/src/guild/`                                        | Engine, world, overlays, render, presentation                                                              | Non-React engine classes; React only for overlays and the host component.                                     |
+| `apps/web/src/routes/_chat.guild.tsx`                        | The Guild route                                                                                            | See [13](13_presentation-modes.md).                                                                           |
 
 Even though upstream merges are off (U-003), keep Guild in these modules (ARCH-04, "avoid god files"). Edit T3 files only where Guild must hook in (route registration, command palette entries, keybinding contract, ws handler registration, `server.ts` wiring, shell fields if a status signal is missing). Each such edit is small and listed in the task card that makes it.
 

@@ -38,17 +38,17 @@ Opening real work from Guild:
 
 ### Brief §9.2 surfaces: what covers each (decision D-025)
 
-| Brief asks for | Covered by |
-|---|---|
-| File tree, open/edit files, search, shortcuts, syntax highlighting, large panels | T3's file browser and editable viewer (`@pierre/trees`, `@pierre/diffs/edit`), content search |
-| Added/modified/deleted files, unified or side-by-side diffs | T3's `DiffPanel` (split/unified, file tree) |
-| **Staged and unstaged changes** | T3 has one working-tree list and an `unstaged` diff selection, no separate staging area (00 §6). Guild adds none; commits go through T3's Git actions, which stage the chosen files. Listed in decisions §Unsupported. |
-| Current branch, base revision, commits, worktrees | T3 branch toolbar and VCS status, plus Guild's context header and workspace board |
-| Conflicts | Predicted conflicts (§Integration) and conflict resolution inside the integration quest's thread and terminal |
-| Terminal for the selected workspace | T3 terminal bound to the attempt thread's worktree |
-| Diagnostics, build output, command history | Command output in the attempt's turn items (`command_execution`) and the terminal history; test output in the Training Grounds. No separate diagnostics panel |
-| Real pull requests | T3 PR tools and views |
-| Review, staging, committing, branch/worktree management, merging, reverting | T3 Git actions, PR actions (merge, revert), `checkpoint.rollback`; Guild adds leases, take-over and merge gates. There is no local `git revert` command in T3; reverting uses the PR action or checkpoint rollback |
+| Brief asks for                                                                   | Covered by                                                                                                                                                                                                             |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| File tree, open/edit files, search, shortcuts, syntax highlighting, large panels | T3's file browser and editable viewer (`@pierre/trees`, `@pierre/diffs/edit`), content search                                                                                                                          |
+| Added/modified/deleted files, unified or side-by-side diffs                      | T3's `DiffPanel` (split/unified, file tree)                                                                                                                                                                            |
+| **Staged and unstaged changes**                                                  | T3 has one working-tree list and an `unstaged` diff selection, no separate staging area (00 §6). Guild adds none; commits go through T3's Git actions, which stage the chosen files. Listed in decisions §Unsupported. |
+| Current branch, base revision, commits, worktrees                                | T3 branch toolbar and VCS status, plus Guild's context header and workspace board                                                                                                                                      |
+| Conflicts                                                                        | Predicted conflicts (§Integration) and conflict resolution inside the integration quest's thread and terminal                                                                                                          |
+| Terminal for the selected workspace                                              | T3 terminal bound to the attempt thread's worktree                                                                                                                                                                     |
+| Diagnostics, build output, command history                                       | Command output in the attempt's turn items (`command_execution`) and the terminal history; test output in the Training Grounds. No separate diagnostics panel                                                          |
+| Real pull requests                                                               | T3 PR tools and views                                                                                                                                                                                                  |
+| Review, staging, committing, branch/worktree management, merging, reverting      | T3 Git actions, PR actions (merge, revert), `checkpoint.rollback`; Guild adds leases, take-over and merge gates. There is no local `git revert` command in T3; reverting uses the PR action or checkpoint rollback     |
 
 ### The Forge (ROOM-05, GIT-06; Increment 4)
 

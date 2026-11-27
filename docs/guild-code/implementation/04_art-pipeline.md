@@ -39,22 +39,22 @@ Everything renders through the same pipeline (`layerToImage` with a palette tabl
 
 The reference encodes meaning in its roles. Keep it:
 
-| Role | Meaning in the reference | Use it for |
-|---|---|---|
-| `O` (also `#`, `K`) | Outline, `#241432` | Automatic outline; occasional interior detail lines (eyes slits, seams) |
-| `A a L` | Primary colour, shade, light | Main garment, hat, banner field |
-| `B b` | Secondary, shade | Trousers, trims, second cloth |
-| `C c` | Accent, shade | Belts, hair, crests, fins |
-| `H h i` | Body/skin of the species: base, shade, highlight | Heads, ears, tails |
-| `E e` | Eyes; eye accent or blush | Faces only |
-| `S s` | Hands/skin, shade | Hands, bare arms |
-| `M m` | Metal, shade (fixed) | Armour, tools, nails, hinges |
-| `D d` | Wood/leather, shade (fixed) | Handles, furniture, books' covers |
-| `W w` | Off-white, shade (fixed) | Paper, bone, cloth highlights |
-| `G g` | Gold, shade (fixed) | Coins, trims, lamp flames, emblems |
-| `k j` | Dark cloth, its light (fixed) | Ninja cloth, lamp posts, shadows on props |
-| `X` / `x` | Pure white / palette light | Effects only (slashes, sparkles); never outlined |
-| `P` | Leg placeholder | Remapped to the outfit's leg role |
+| Role                | Meaning in the reference                         | Use it for                                                              |
+| ------------------- | ------------------------------------------------ | ----------------------------------------------------------------------- |
+| `O` (also `#`, `K`) | Outline, `#241432`                               | Automatic outline; occasional interior detail lines (eyes slits, seams) |
+| `A a L`             | Primary colour, shade, light                     | Main garment, hat, banner field                                         |
+| `B b`               | Secondary, shade                                 | Trousers, trims, second cloth                                           |
+| `C c`               | Accent, shade                                    | Belts, hair, crests, fins                                               |
+| `H h i`             | Body/skin of the species: base, shade, highlight | Heads, ears, tails                                                      |
+| `E e`               | Eyes; eye accent or blush                        | Faces only                                                              |
+| `S s`               | Hands/skin, shade                                | Hands, bare arms                                                        |
+| `M m`               | Metal, shade (fixed)                             | Armour, tools, nails, hinges                                            |
+| `D d`               | Wood/leather, shade (fixed)                      | Handles, furniture, books' covers                                       |
+| `W w`               | Off-white, shade (fixed)                         | Paper, bone, cloth highlights                                           |
+| `G g`               | Gold, shade (fixed)                              | Coins, trims, lamp flames, emblems                                      |
+| `k j`               | Dark cloth, its light (fixed)                    | Ninja cloth, lamp posts, shadows on props                               |
+| `X` / `x`           | Pure white / palette light                       | Effects only (slashes, sparkles); never outlined                        |
+| `P`                 | Leg placeholder                                  | Remapped to the outfit's leg role                                       |
 
 Rules:
 

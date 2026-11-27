@@ -8,7 +8,7 @@ The rules that keep the game cheap while agents work, the sanctioned exception t
 
 ## Read first
 
-1. Root [AGENTS.md](../../../AGENTS.md) *Performance* and *Taste*.
+1. Root [AGENTS.md](../../../AGENTS.md) _Performance_ and _Taste_.
 2. [docs/internals/16_performance-regressions.md](../../internals/16_performance-regressions.md).
 3. [01_architecture.md](01_architecture.md), [02_domain-model.md](02_domain-model.md) §Bridging T3 events.
 
@@ -56,20 +56,20 @@ Targets on a normal laptop at 60 fps, with up to 12 NPCs visible:
 
 Every case is handled explicitly and visible to the user:
 
-| Failure | Detection | Behaviour |
-|---|---|---|
-| Provider rate limit | `lastErrorClass: usage_limit`, `usageLimitResetAt` (00 §2) | NPC rests with reset time; T3's own auto-resume (`UsageLimitRecoveryWorker`) applies if the user enabled it in T3; Guild doesn't add its own retry |
-| Provider disconnected | `lastErrorClass: transport_error` | live state `disconnected` (07), offline marker, not a failure; "Continue" sends a new message to the same thread when the user asks |
-| Provider session error | session status `error`, other error classes | live state `failed`; dialogue shows the error; "Continue" as above |
-| Bound family / model unavailable | `resolveBinding` error (06) | no launch; reason and fix actions shown |
-| Executed model outside family | bridge comparison (06) | warning; scheduler waits for acknowledgement (Increment 3+) |
-| Command or tool failure inside a turn | T3 turn items | shown in the thread as T3 shows it; Guild doesn't interpret it |
-| Permission rejected by the user | T3 runtime request resolved `decline` | the agent continues per provider behaviour; Guild records nothing special |
-| Dirty worktree | VCS status | never touched automatically (10) |
-| Lost session / thread deleted | bridge sees deletion | attempt `cancelled`, `statusReason: thread_deleted` |
-| User cancellation | user action | attempts stopped via T3, leases released, quest `cancelled` |
-| Guild outbox side effect fails | worker error | if T3 has an accepted receipt for the deterministic command id, treat as done; otherwise mark the attempt `failed` with the error. Re-running follows the single retry rule in 02 §Making changes |
-| Client disconnected | connection phase | world shows unknown/offline states (07) |
+| Failure                               | Detection                                                  | Behaviour                                                                                                                                                                                         |
+| ------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Provider rate limit                   | `lastErrorClass: usage_limit`, `usageLimitResetAt` (00 §2) | NPC rests with reset time; T3's own auto-resume (`UsageLimitRecoveryWorker`) applies if the user enabled it in T3; Guild doesn't add its own retry                                                |
+| Provider disconnected                 | `lastErrorClass: transport_error`                          | live state `disconnected` (07), offline marker, not a failure; "Continue" sends a new message to the same thread when the user asks                                                               |
+| Provider session error                | session status `error`, other error classes                | live state `failed`; dialogue shows the error; "Continue" as above                                                                                                                                |
+| Bound family / model unavailable      | `resolveBinding` error (06)                                | no launch; reason and fix actions shown                                                                                                                                                           |
+| Executed model outside family         | bridge comparison (06)                                     | warning; scheduler waits for acknowledgement (Increment 3+)                                                                                                                                       |
+| Command or tool failure inside a turn | T3 turn items                                              | shown in the thread as T3 shows it; Guild doesn't interpret it                                                                                                                                    |
+| Permission rejected by the user       | T3 runtime request resolved `decline`                      | the agent continues per provider behaviour; Guild records nothing special                                                                                                                         |
+| Dirty worktree                        | VCS status                                                 | never touched automatically (10)                                                                                                                                                                  |
+| Lost session / thread deleted         | bridge sees deletion                                       | attempt `cancelled`, `statusReason: thread_deleted`                                                                                                                                               |
+| User cancellation                     | user action                                                | attempts stopped via T3, leases released, quest `cancelled`                                                                                                                                       |
+| Guild outbox side effect fails        | worker error                                               | if T3 has an accepted receipt for the deterministic command id, treat as done; otherwise mark the attempt `failed` with the error. Re-running follows the single retry rule in 02 §Making changes |
+| Client disconnected                   | connection phase                                           | world shows unknown/offline states (07)                                                                                                                                                           |
 
 ### Restart recovery (T3-05, ARCH-02, ACC-RECOV)
 

@@ -183,6 +183,9 @@ export default defineConfig({
       "infra/task-cache/vendor/**",
       // Macroscope requires one glob per line; Markdown formatting corrupts it.
       ".macroscope/ignore.md",
+      // Guild's verbatim sources: the brief is quoted word for word and the reference HTML is read-only (ART-02).
+      "docs/guild-code/brief.md",
+      "docs/guild-code/index-24.html",
       ".alchemy",
       "dist",
       "dist-electron",
