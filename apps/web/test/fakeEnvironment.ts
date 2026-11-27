@@ -238,6 +238,7 @@ export interface FakeThread {
   readonly olderSettled?: true;
   readonly id: ThreadId;
   readonly title: string;
+  readonly shell?: Partial<OrchestrationV2ThreadShell>;
   /** Defaults to GPT-5.4 on Codex. */
   readonly modelSelection?: ModelSelection;
   /** The first is the thread's active provider thread. */
@@ -319,7 +320,7 @@ export function threadWithQuestion(name: string, question: string): FakeThread {
 
 const parentOf = (thread: FakeThread) => thread.sideChatOf ?? thread.providerSubagentOf;
 
-function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {
+export function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {
   const latest = thread.runs.at(-1);
   const modelSelection = thread.modelSelection ?? MODEL;
   return {
@@ -361,6 +362,7 @@ function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {
     settledAt: thread.olderSettled ? AT : null,
     lastVisitedAt: AT,
     deletedAt: null,
+    ...thread.shell,
   };
 }
 
@@ -731,5 +733,18 @@ export async function emitThreadEvent(
       sequence,
       event: { ...event, id: EventId.make(`event-${sequence}`), threadId, occurredAt: AT },
     } as OrchestrationV2ThreadStreamItem),
+  );
+}
+
+export async function emitThreadShell(thread: FakeThread): Promise<void> {
+  if (!shellSubscriber) throw new Error("No live shell subscription.");
+  threads = threads.map((candidate) => (candidate.id === thread.id ? thread : candidate));
+  await Effect.runPromise(
+    Queue.offer(shellSubscriber, {
+      kind: "thread.updated",
+      sequence: ++sequence,
+      location: "active",
+      thread: shellOf(thread),
+    }),
   );
 }

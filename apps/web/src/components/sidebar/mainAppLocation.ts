@@ -55,9 +55,13 @@ export function getAppModalReturnThreadTarget() {
   return appModalReturnThreadTarget;
 }
 
+export function mainAppReturnHref() {
+  return mainAppHref ?? "/";
+}
+
 export function useNavigateToMainApp() {
   const navigate = useNavigate();
-  return () => navigate({ href: mainAppHref ?? "/" });
+  return () => navigate({ href: mainAppReturnHref() });
 }
 
 /** Leaves Settings or Usage for the page that opened it. */
