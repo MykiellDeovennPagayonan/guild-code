@@ -1,30 +1,25 @@
 import type { CommandId } from "@t3tools/contracts";
 import {
-  Adventurer,
-  Attempt,
   type GuildAdventurerProfile,
   type GuildAttemptPage,
   type GuildCreateMasterInput,
-  type GuildDelta,
-  type GuildEndConversationInput,
   type GuildGetAdventurerProfileInput,
-  type GuildHireAdventurerInput,
   type GuildListAttemptsInput,
   type GuildRefreshCandidatesInput,
   type GuildSetMasterLocationInput,
-  type GuildStartConversationInput,
   type GuildStreamItem,
   type GuildSubscribeInput,
   type GuildUpdateMasterInput,
   GuildAdventurerNotFoundError,
+  GuildAppearanceError,
   GuildCommandConflictError,
   type GuildCommandRejection,
   GuildMaster,
   GuildMasterAlreadyExistsError,
   GuildMasterMissingError,
-  GuildNotImplementedError,
   GuildSettings,
 } from "@t3tools/contracts/guild";
+import { parseAppearance } from "@t3tools/guild-art/appearance";
 import * as DateTime from "effect/DateTime";
 import * as Context from "effect/Context";
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -33,23 +28,22 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
 import * as Schema from "effect/Schema";
+import type * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 
 import { toPersistenceDecodeError } from "../persistence/Errors.ts";
 import * as GuildStore from "./GuildStore.ts";
 
+import { makeWorkCommands, type Change } from "./GuildWorkCommands.ts";
+import * as GuildWorkStore from "./GuildWorkStore.ts";
+
 type CommandError = GuildCommandRejection | GuildCommandConflictError | GuildStore.GuildStoreError;
 type Command<A> = Effect.Effect<A, CommandError>;
-type Change<A> = {
-  readonly value: A;
-  readonly activity: ReadonlyArray<{
-    readonly entity: string;
-    readonly entityId: string;
-    readonly before: Schema.Json;
-    readonly after: Schema.Json;
-    readonly delta: GuildDelta;
-  }>;
-};
+
+const validateAppearance = Effect.fn("GuildService.validateAppearance")(
+  (appearance: GuildMaster["appearance"]) =>
+    Effect.try({ try: () => parseAppearance(appearance), catch: () => new GuildAppearanceError() }),
+);
 
 export class GuildService extends Context.Service<
   GuildService,
@@ -70,10 +64,9 @@ export class GuildService extends Context.Service<
     readonly listAttempts: (
       input: GuildListAttemptsInput,
     ) => Effect.Effect<GuildAttemptPage, GuildStore.GuildStoreError>;
-    readonly hireAdventurer: (input: GuildHireAdventurerInput) => Command<Adventurer>;
-    readonly startConversation: (input: GuildStartConversationInput) => Command<Attempt>;
-    readonly endConversation: (input: GuildEndConversationInput) => Command<Attempt>;
-  }
+    readonly notifyCommitted: Effect.Effect<void>;
+    readonly subscribeCommits: Effect.Effect<PubSub.Subscription<void>, never, Scope.Scope>;
+  } & Effect.Success<ReturnType<typeof makeWorkCommands>>
 >()("t3/guild/GuildService") {}
 
 const replayLimit = 128;
@@ -85,14 +78,15 @@ const make = Effect.gen(function* () {
   const store = yield* GuildStore.GuildStore;
   const random = yield* SecureRandom.SecureRandom;
   const committed = yield* PubSub.sliding<void>(1);
+  const notifyCommitted = PubSub.publish(committed, undefined).pipe(Effect.asVoid);
 
-  const mutate = Effect.fn("GuildService.mutate")(function* <A extends Schema.Json>(
+  const mutate = Effect.fn("GuildService.mutate")(function* <A extends Schema.Json, R>(
     commandId: CommandId,
     operation: string,
     resultSchema: Schema.Decoder<A>,
     apply: (
       at: string,
-    ) => Effect.Effect<Change<A>, GuildCommandRejection | GuildStore.GuildStoreError>,
+    ) => Effect.Effect<Change<A>, GuildCommandRejection | GuildStore.GuildStoreError, R>,
   ) {
     const { result } = yield* store
       .transaction(
@@ -118,6 +112,10 @@ const make = Effect.gen(function* () {
               GuildMasterAlreadyExistsError: reject,
               GuildMasterMissingError: reject,
               GuildNotImplementedError: reject,
+              GuildAppearanceError: reject,
+              GuildCandidateGoneError: reject,
+              GuildBindingError: reject,
+              GuildConversationError: reject,
             }),
           );
           yield* store.saveReceipt({ commandId, operation, result, createdAt: at });
@@ -126,7 +124,7 @@ const make = Effect.gen(function* () {
       )
       .pipe(
         // A disconnected caller can interrupt after SQLite commits. The wakeup must still run.
-        Effect.tap(({ changed }) => (changed ? PubSub.publish(committed, undefined) : Effect.void)),
+        Effect.tap(({ changed }) => (changed ? notifyCommitted : Effect.void)),
         Effect.uninterruptible,
       );
 
@@ -191,16 +189,6 @@ const make = Effect.gen(function* () {
     return { sequence, items };
   }, store.transaction);
 
-  function unavailable<A extends Schema.Json>(
-    commandId: CommandId,
-    action: GuildNotImplementedError["action"],
-    resultSchema: Schema.Decoder<A>,
-  ) {
-    return mutate(commandId, action, resultSchema, () =>
-      Effect.fail(new GuildNotImplementedError({ action })),
-    );
-  }
-
   const createMaster = Effect.fn("GuildService.createMaster")(
     ({ commandId, name, appearance }: GuildCreateMasterInput) =>
       mutate(commandId, "createMaster", GuildMaster, (createdAt) =>
@@ -210,7 +198,7 @@ const make = Effect.gen(function* () {
           return yield* saveMaster(
             {
               name,
-              appearance,
+              appearance: yield* validateAppearance(appearance),
               createdAt,
               location: { sceneId: "guild_hall", doorId: null, x: 30, facing: 1 },
             },
@@ -225,7 +213,10 @@ const make = Effect.gen(function* () {
       mutate(commandId, "updateMaster", GuildMaster, () =>
         Effect.gen(function* () {
           const master = yield* requireMaster();
-          return yield* saveMaster({ ...master, name, appearance }, master);
+          return yield* saveMaster(
+            { ...master, name, appearance: yield* validateAppearance(appearance) },
+            master,
+          );
         }),
       ),
   );
@@ -315,19 +306,12 @@ const make = Effect.gen(function* () {
     refreshCandidates,
     getAdventurerProfile,
     listAttempts,
-    hireAdventurer: Effect.fn("GuildService.hireAdventurer")(
-      ({ commandId }: GuildHireAdventurerInput) =>
-        unavailable(commandId, "hireAdventurer", Adventurer),
-    ),
-    startConversation: Effect.fn("GuildService.startConversation")(
-      ({ commandId }: GuildStartConversationInput) =>
-        unavailable(commandId, "startConversation", Attempt),
-    ),
-    endConversation: Effect.fn("GuildService.endConversation")(
-      ({ commandId }: GuildEndConversationInput) =>
-        unavailable(commandId, "endConversation", Attempt),
-    ),
+    notifyCommitted,
+    subscribeCommits: PubSub.subscribe(committed),
+    ...(yield* makeWorkCommands(mutate)),
   });
 });
 
-export const layer = Layer.effect(GuildService, make).pipe(Layer.provide(GuildStore.layer));
+export const layer = Layer.effect(GuildService, make).pipe(
+  Layer.provide(Layer.merge(GuildStore.layer, GuildWorkStore.layer)),
+);

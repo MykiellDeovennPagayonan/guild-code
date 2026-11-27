@@ -2075,9 +2075,20 @@ export const layerWsRpc = (
         [WS_METHODS.guildListAttempts]: (input) =>
           guild.listAttempts(input).pipe(Effect.mapError(guildRpcError)),
         [WS_METHODS.guildHireAdventurer]: (input) =>
-          guild.hireAdventurer(input).pipe(Effect.mapError(guildRpcError)),
+          guild
+            .hireAdventurer(input)
+            .pipe(
+              Effect.provideService(ProviderRegistry.ProviderRegistry, providerRegistry),
+              Effect.mapError(guildRpcError),
+            ),
         [WS_METHODS.guildStartConversation]: (input) =>
-          guild.startConversation(input).pipe(Effect.mapError(guildRpcError)),
+          guild
+            .startConversation(input)
+            .pipe(
+              Effect.provideService(ProviderRegistry.ProviderRegistry, providerRegistry),
+              Effect.provideService(ProjectStore.ProjectStoreV2, projectStore),
+              Effect.mapError(guildRpcError),
+            ),
         [WS_METHODS.guildEndConversation]: (input) =>
           guild.endConversation(input).pipe(Effect.mapError(guildRpcError)),
       });

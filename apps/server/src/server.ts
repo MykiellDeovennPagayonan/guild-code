@@ -46,6 +46,10 @@ import {
 } from "./httpResponseErrorGuard.ts";
 import { resolveLauncherPath } from "./cloud/pinnedRuntime.ts";
 import { fixPath } from "./os-jank.ts";
+import * as GuildOutboxWorker from "./guild/GuildOutboxWorker.ts";
+import * as GuildRunBridge from "./guild/GuildRunBridge.ts";
+import * as GuildStore from "./guild/GuildStore.ts";
+import * as GuildWorkStore from "./guild/GuildWorkStore.ts";
 import * as GuildService from "./guild/GuildService.ts";
 import * as Ws from "./ws.ts";
 import * as AgentScopeLive from "./process/agentScope.ts";
@@ -243,6 +247,7 @@ import * as ThreadPullRequestService from "./orchestration-v2/ThreadPullRequestS
 import * as ThreadIssueService from "./orchestration-v2/ThreadIssueService.ts";
 import * as RunFinalizationService from "./orchestration-v2/RunFinalizationService.ts";
 import * as ProjectionMaintenance from "./orchestration-v2/ProjectionMaintenance.ts";
+import * as CommandReceiptStore from "./orchestration-v2/CommandReceiptStore.ts";
 import * as ProjectionStoreV2 from "./orchestration-v2/ProjectionStore.ts";
 import { makePersistedServerRuntimeState } from "./serverRuntimeState.ts";
 import { closeNonPrivateNetworkConnections, loopbackUrlHostForAddress } from "./startupAccess.ts";
@@ -786,7 +791,22 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   ReplayMarkers.layer,
   Layer.effectDiscard(ProjectSettingsOverrideSweep.sweep),
 ).pipe(
-  Layer.provideMerge(layerOrchestrationApplication),
+  Layer.provideMerge(
+    GuildOutboxWorker.layer.pipe(
+      Layer.provideMerge(GuildRunBridge.layer),
+      Layer.provideMerge(GuildService.layer),
+      Layer.provide(
+        Layer.mergeAll(
+          GuildStore.layer,
+          GuildWorkStore.layer,
+          ProjectionStoreV2.layer,
+          RuntimeLayer.layerEventSink,
+          CommandReceiptStore.layerFromApplicationReceipts,
+        ),
+      ),
+      Layer.provideMerge(layerOrchestrationApplication),
+    ),
+  ),
   // One hub, which the feeders above and the workflow store inside the runtime publish to.
   Layer.provideMerge(MilestoneHub.layer),
   Layer.provideMerge(Layer.merge(layerTaskFolders, LayoutCommandApprovalWrites.layer)),
@@ -950,7 +970,6 @@ const layerMakeRoutes = Layer.mergeAll(
   Layer.provide(layerPullRequestService),
   Layer.provide(layerThreadIssueService),
   Layer.provide(layerIssueService),
-  Layer.provide(GuildService.layer),
   // The same activity instance RunExecutionService reports to, by layer memoization.
   Layer.provide(
     ServerBrowser.layer.pipe(
@@ -1395,7 +1414,7 @@ const layerMakeServer = Layer.unwrap(
       }),
     );
 
-    const layerRuntimeServices = ServerRuntimeStartup.layerWithOptions({
+    const layerRuntimeServices = ServerRuntimeStartup.layerWithGuild({
       activate: Deferred.succeed(activation, undefined).pipe(Effect.asVoid),
       abort: (error) => Deferred.die(activation, error).pipe(Effect.asVoid),
       awaitAuxiliaryParked: Effect.all(

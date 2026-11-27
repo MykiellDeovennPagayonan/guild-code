@@ -37,6 +37,8 @@ import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as EffectWorker from "./orchestration-v2/EffectWorker.ts";
 import * as LegacyV1ThreadImporter from "./orchestration-v2/legacy/LegacyV1ThreadImporter.ts";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
+import * as GuildOutboxWorker from "./guild/GuildOutboxWorker.ts";
+import * as GuildRunBridge from "./guild/GuildRunBridge.ts";
 import * as ProviderRuntimeRecovery from "./orchestration-v2/ProviderRuntimeRecoveryService.ts";
 import * as ProviderSessionManager from "./orchestration-v2/ProviderSessionManager.ts";
 import * as ThreadLaunch from "./orchestration-v2/ThreadLaunchService.ts";
@@ -450,7 +452,10 @@ const runOrderedV2StartupPhases = Effect.fn("serverRuntimeStartup.runOrderedV2St
   },
 );
 
-const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: StartupOptions) {
+const make = Effect.fn("serverRuntimeStartup.make")(function* <E, R>(
+  options: StartupOptions | undefined,
+  recoverGuild: Effect.Effect<void, E, R>,
+) {
   const serverConfig = yield* ServerConfig.ServerConfig;
   const keybindings = yield* Keybindings.Keybindings;
   const legacyV1ThreadImporter = yield* LegacyV1ThreadImporter.LegacyV1ThreadImporter;
@@ -552,7 +557,9 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
           ),
         ),
       ),
-      recover: runStartupPhase("orchestration-v2.recovery", providerRuntimeRecovery.recover),
+      recover: runStartupPhase("orchestration-v2.recovery", providerRuntimeRecovery.recover).pipe(
+        Effect.tap(() => runStartupPhase("guild.recovery", recoverGuild)),
+      ),
       recoverDelegatedTasks: runStartupPhase(
         "orchestration-v2.delegated-tasks.recover",
         orchestrator.recoverDelegatedTasks,
@@ -737,4 +744,19 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
 });
 
 export const layerWithOptions = (options?: StartupOptions) =>
-  Layer.effect(ServerRuntimeStartup, make(options));
+  Layer.effect(ServerRuntimeStartup, make(options, Effect.void));
+
+export const layerWithGuild = (options: StartupOptions) =>
+  Layer.effect(
+    ServerRuntimeStartup,
+    make(
+      options,
+      Effect.gen(function* () {
+        const outbox = yield* GuildOutboxWorker.GuildOutboxWorker;
+        const bridge = yield* GuildRunBridge.GuildRunBridge;
+        yield* outbox.recover();
+        yield* bridge.start();
+        yield* outbox.start();
+      }),
+    ),
+  );

@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./binding": "./src/binding.ts",
+    "./briefing": "./src/briefing.ts",
+    "./classes": "./src/classes.ts",
+    "./families": "./src/families.ts",
+    "./lifecycle/attempt": "./src/lifecycle/attempt.ts",
     "./names": {
       "types": "./src/names.ts",
       "import": "./src/names.ts"
@@ -16,6 +21,10 @@
   "scripts": {
     "typecheck": "effect-tsgo tsrs --noEmit",
     "test": "vp test run --config ../../vite.config.ts --dir ."
+  },
+  "dependencies": {
+    "@t3tools/contracts": "workspace:*",
+    "@t3tools/guild-art": "workspace:*"
   },
   "devDependencies": {
     "vite-plus": "catalog:"

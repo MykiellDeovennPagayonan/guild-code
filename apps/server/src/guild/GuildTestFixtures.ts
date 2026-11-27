@@ -1,19 +1,9 @@
+import { DEFAULT_APPEARANCE } from "@t3tools/guild-art/appearance";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
-import { GuildAdventurerId, GuildAttemptId, type Appearance } from "@t3tools/contracts/guild";
+import { GuildAdventurerId, GuildAttemptId } from "@t3tools/contracts/guild";
 
-export const appearance = {
-  v: 1,
-  species: "human",
-  head: "round",
-  top: "none",
-  face: "plain",
-  outfit: "tunic",
-  boots: "leather",
-  back: "none",
-  weapon: "none",
-  palette: "oak",
-} satisfies Appearance;
+export const appearance = DEFAULT_APPEARANCE;
 
 export const adventurerId = (index: number) => GuildAdventurerId.make(`adventurer-${index}`);
 export const attemptId = (index: number, kind: "earlier" | "latest") =>
