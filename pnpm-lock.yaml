@@ -1166,6 +1166,9 @@ importers:
       '@t3tools/guild-art':
         specifier: workspace:*
         version: link:../../packages/guild-art
+      '@t3tools/guild-core':
+        specifier: workspace:*
+        version: link:../../packages/guild-core
       '@t3tools/provider-core':
         specifier: workspace:*
         version: link:../../packages/provider-core

@@ -13,6 +13,7 @@
       "types": "./src/names.ts",
       "import": "./src/names.ts"
     },
+    "./presentation": "./src/presentation.ts",
     "./recruitment": {
       "types": "./src/recruitment.ts",
       "import": "./src/recruitment.ts"

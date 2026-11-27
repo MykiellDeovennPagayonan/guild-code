@@ -17,7 +17,7 @@ import { VIEW_HEIGHT, VIEW_WIDTH } from "./camera";
 import { GuildInput } from "./input";
 import { interactionPrompt, pickTarget, selectTarget, type InteractionTarget } from "./interaction";
 import { WorldLoop, type FrameScheduler } from "./loop";
-import { NpcClip, type GuildPresentation, type NpcEntity } from "./npc";
+import { drawNpcOverhead, NpcClip, type GuildPresentation, type NpcEntity } from "./npc";
 import { Particles } from "./particles";
 import { Player, TILE } from "./player";
 import { Scene, type DoorDef, type SceneDef, type SceneId } from "./scene";
@@ -47,12 +47,11 @@ class CharacterSprite {
     private readonly invalidate: () => void,
   ) {
     this.key = appearanceKey(appearance);
-    this.load();
   }
 
   read() {
     const sheet = readSheet(this.key);
-    if (!sheet && this.status === "ready") this.load();
+    if (!sheet && (this.status === "needed" || this.status === "ready")) this.load();
     return sheet;
   }
 
@@ -484,6 +483,10 @@ export class GuildEngine {
       drawChar(buffer, playerSheet, player.pose(still), player.x - x, player.y - y, player.facing);
     }
     if (!still) this.particles.draw(buffer, x, y);
+    for (const { entity } of this.npcs) {
+      if (entity.x < x || entity.x >= x + VIEW_WIDTH) continue;
+      drawNpcOverhead(buffer, entity, entity.x - x, entity.y - y);
+    }
     if (this.hovered) {
       const { x: anchorX, y: anchorY, width, height } = this.hovered;
       buffer.strokeStyle = "#f5c84b";
@@ -498,7 +501,12 @@ export class GuildEngine {
     if (target) {
       const width = textWidth(this.pixelPrompt);
       const left = Math.max(3, Math.min(VIEW_WIDTH - width - 3, target.x - x - width / 2));
-      drawText(buffer, this.pixelPrompt, left, Math.max(15, target.y - y - target.height - 10));
+      drawText(
+        buffer,
+        this.pixelPrompt,
+        left,
+        Math.max(15, target.y - y - target.height - (target.kind === "npc" ? 27 : 10)),
+      );
     }
     if (this.transition) {
       const time = this.transition.elapsed;

@@ -83,6 +83,7 @@ import {
   PinOffIcon,
   PlugIcon,
   SquarePenIcon,
+  SwordsIcon,
   TextSearchIcon,
   UserPlusIcon,
   WorkflowIcon,
@@ -105,6 +106,7 @@ import { useAtomValue } from "@effect/atom-react";
 
 import { isDesktopLocalConnectionTarget } from "../connection/desktopLocal";
 import { useDesktopLocalBootstraps } from "../connection/useDesktopLocalBootstraps";
+import { useGuildAdventurers } from "../guild/state/guild";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { useOpenPanelPullRequestUrl } from "../hooks/useOpenPanelPullRequestUrl";
 import { copyThreadReference } from "../lib/copyThreadReference";
@@ -512,6 +514,7 @@ function OpenCommandPaletteDialog(props: {
   const { environments } = useEnvironments();
   const desktopLocalBootstraps = useDesktopLocalBootstraps();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const guildAdventurers = useGuildAdventurers(deferredQuery.trim().length > 0);
   const settingsSearchItems = useCommandPaletteSettingsItems(deferredQuery.trim().length > 0);
   const { activeDraftThread, activeThread, defaultProjectRef, handleNewThread } =
     useHandleNewThread();
@@ -1787,6 +1790,45 @@ function OpenCommandPaletteDialog(props: {
       );
     },
   });
+
+  if (primaryEnvironmentId !== null) {
+    actionItems.push(
+      {
+        kind: "action",
+        value: "action:guild",
+        searchTerms: ["guild", "adventure"],
+        title: gt("Open Guild"),
+        icon: <SwordsIcon className={ITEM_ICON_CLASS} />,
+        shortcutCommand: "guild.toggle",
+        run: async () => {
+          await navigate({ to: "/guild", search: {} });
+        },
+      },
+      {
+        kind: "action",
+        value: "action:guild-edit-master",
+        searchTerms: ["guild", "master", "appearance"],
+        title: gt("Edit Guild Master"),
+        icon: <SwordsIcon className={ITEM_ICON_CLASS} />,
+        run: async () => {
+          await navigate({ to: "/guild", search: { editMaster: true } });
+        },
+      },
+    );
+    for (const adventurer of guildAdventurers ?? []) {
+      if (adventurer.status !== "active") continue;
+      actionItems.push({
+        kind: "action",
+        value: `guild:adventurer:${adventurer.id}`,
+        searchTerms: [adventurer.name, "guild", "adventurer", adventurer.classId],
+        title: gt("Talk to {name}", { name: adventurer.name }),
+        icon: <SwordsIcon className={ITEM_ICON_CLASS} />,
+        run: async () => {
+          await navigate({ to: "/guild", search: { adventurerId: adventurer.id } });
+        },
+      });
+    }
+  }
 
   if (workflowsReachable) {
     actionItems.push({
