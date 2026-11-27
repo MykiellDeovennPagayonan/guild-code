@@ -1,12 +1,24 @@
-# T3 Code
+# Guild (built on T3 Code)
+
+## Read this first: this repo is Guild, not T3 Code
+
+This repo is a **personal fork of T3 Code**. It is not contributed upstream, and upstream changes are not merged in. On top of T3 we are building **Guild**: a side-scrolling pixel-art guild where persistent AI adventurers do real engineering work through T3's providers, threads, worktrees and diffs.
+
+- **Before any task, read [docs/guild-code/README.md](docs/guild-code/README.md)** and follow its reading order (decisions, agent rules, glossary, your task card).
+- **When guidance conflicts:** [docs/guild-code/decisions.md](docs/guild-code/decisions.md) wins, then the rest of `docs/guild-code/`, then the T3 guidance below.
+- **Guild targets web and desktop only.** Mobile keeps the normal T3 UI and must keep working.
+- **Guild copy is English only** (decisions U-006, D-024).
+- Everything below describes the T3 code Guild runs on. It still applies unless `docs/guild-code/` says otherwise.
+
+## About T3 Code
 
 T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs and agents (Codex, Claude Code, Cursor, Grok, OpenCode, Antigravity, Kiro, Pi, Muse Code, fx) and serves web, desktop, and mobile clients.
 
 You can think of T3 Code as an open source "bring-your-own-subscription" alternative to apps like Claude Desktop, Codex App, Cursor Glass and Conductor.
 
-## What makes T3 Code special?
+## Inherited T3 principles
 
-We have over 500,000 users who love T3 Code. It's important we maintain the things they love as we continue to iterate on the product. Here's a brief list of the things we can never compromise on.
+Guild keeps the things that make T3 Code good. Don't compromise on these.
 
 ### 1. Open at the core
 
@@ -20,7 +32,11 @@ Lots of apps have gotten bogged down with bad tech decisions and "slop". We have
 
 The architecture of T3 Code's websocket layer (`t3`) enables a lot of awesome remote features. These have become core to the product. Whether users are connecting directly over their local network, using Tailscale, or leaning in fully with T3 Connect (our tunnel solution, also in this repo), we need to make sure new features are properly supported.
 
+For Guild: remote access isn't required yet (decision U-007), but Guild data travels over the normal websocket contracts, so don't add local-only shortcuts that would block it later.
+
 ### 4. Multi-surface
+
+For Guild: web and desktop only (decision U-004). Mobile gets no Guild UI but must not break; shared package changes must still pass for `apps/mobile`. The text below describes T3's surfaces.
 
 T3 Code has 3 key app surfaces: **web**, **desktop**, and **mobile**.
 
@@ -53,7 +69,9 @@ Of note: Most T3 Code contributions will come from T3 Code itself, often control
 
 ## Hit every surface
 
-The most common defect in this repo is a change that works on the path you tested and is missing everywhere else. Before calling frontend work done, walk this list and say which entries applied:
+The most common defect in this repo is a change that works on the path you tested and is missing everywhere else. Before calling frontend work done, walk this list and say which entries applied.
+
+For Guild work, read the list this way: **entry points** are the world (E or click), focus-mode pages under `/guild/*`, the command palette and keybindings; **clients** are web and desktop (check that mobile still builds); **providers** need a decision for every adapter (for example Cursor reports no approvals); **agents** reach Guild actions through Guild services and Guild MCP tools; **languages**: Guild copy is English only (D-024); **docs** include `docs/guild-code/`.
 
 - **Entry points.** Chat view, Settings, command palette, and keybindings. Fixing one is not fixing the feature.
 - **Clients.** Web, desktop (Electron shell/IPC), and mobile (React Native). Shared logic lives in `packages/client-runtime`.
@@ -89,6 +107,7 @@ See [00_development.md](docs/operations/00_development.md) for setup, ports, see
 ## Pull requests
 
 - Never make a PR unless the developer explicitly asks you to do so.
+- PRs target this fork (`origin`), never `pingdotgg/t3code`. CONTRIBUTING.md's outside-contribution policy doesn't apply here.
 - `origin` is not always GitHub. Check `git remote get-url origin` before your first forge command and use that forge's CLI and skill. See [Forge mirror](docs/operations/00_development.md#forge-mirror-optional).
 - Conventional commit titles, plain language: `fix(web): new threads no longer spike CPU`.
 - Body: the problem in a sentence or two, then how you fixed it. End with the model and harness that did the work.
@@ -100,6 +119,8 @@ See [00_development.md](docs/operations/00_development.md) for setup, ports, see
 
 Most code changes do not need an internal documentation change. Agents can read the code.
 
+Exception: `docs/guild-code/` is Guild's pre-implementation spec, so it may list fields, states and flows. Once a part is built, the code is the source of truth and that doc section is cut back to decisions, invariants and reasons ([docs/guild-code/agent-rules.md](docs/guild-code/agent-rules.md) §6).
+
 - `docs/internals/` is for architectural decisions and their reasons, constraints that span components, and implementation traps that are hard to discover from the source. Before adding a paragraph, ask what a maintainer would get wrong without it. If reading the relevant code answers the question, leave it out.
 - Do not document every feature, enumerate fields, methods, constants, timeouts, or migration numbers, narrate control flow, maintain file catalogs, or append PR summaries. Anything that can drift will drift; types, tests, and code already record the implementation. The glossary defines shared vocabulary; it is not a feature index.
 - A local reason the code can't show goes in a short nearby code comment. Use an internal doc when the reasoning crosses boundaries or needs context the code cannot carry well. Link to the relevant source instead of copying it.
@@ -109,7 +130,7 @@ Most code changes do not need an internal documentation change. Agents can read 
 
 ## Plans and work artifacts
 
-- Do not commit implementation plans, research notes, or agent scratch files (keep temporary material outside the worktree).
+- Do not commit implementation plans, research notes, or agent scratch files (keep temporary material outside the worktree). Exception: the Guild spec and task cards in `docs/guild-code/` are committed on purpose (decision U-009).
 - Track active maintainer work in its GitHub issue or project item; external proposals belong in Ideas discussions. A merged PR is the implementation record.
 
 ## Where code lives
@@ -119,6 +140,7 @@ Most code changes do not need an internal documentation change. Agents can read 
 - `packages/contracts` - Effect/Schema wire contracts plus small derived helpers. No heavy runtime logic.
 - `packages/shared` - shared runtime utils, subpath exports, no barrel.
 - `packages/client-runtime` - client connection and domain state shared by web and mobile.
+- Guild (decision D-001): `packages/guild-art` (pure sprite system), `packages/guild-core` (pure domain rules), `packages/contracts/src/guild*.ts`, `packages/client-runtime/src/state/guild.ts`, `apps/server/src/guild/`, `apps/server/src/mcp/toolkits/guild/`, `apps/web/src/guild/`. The visual reference `docs/guild-code/index-24.html` is read-only.
 - `.repos/` - vendored read-only references. Never edit or import from them (`vpr sync:repos` updates them; if sparse-checked-out, read via `git show origin/main:.repos/<path>`).
 
 ### Internal docs by area
@@ -127,6 +149,7 @@ Read the matching doc before changing code in that area; code review enforces th
 
 | Area                                       | Read first                                                                                                                                                                                        |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Guild (everything Guild)**               | [docs/guild-code/README.md](docs/guild-code/README.md)                                                                                                                                            |
 | Architecture & orchestration               | [00_glossary.md](docs/internals/00_glossary.md), [01_architecture.md](docs/internals/01_architecture.md)                                                                                          |
 | Server Effect services & errors            | [02_effect-services.md](docs/internals/02_effect-services.md)                                                                                                                                     |
 | Providers & ACP                            | [03_providers.md](docs/internals/03_providers.md)                                                                                                                                                 |
@@ -152,6 +175,6 @@ Read the matching doc before changing code in that area; code review enforces th
 - Inferred types over annotations. `any` is the enemy.
 - Default to no comment. Write one only for a constraint, external quirk, or invariant the code can't show (1–4 lines max; `t3code/no-low-value-comments` enforces this).
 - React effects are only for synchronizing with external systems. Derive in render and act in handlers; any remaining effect states its reason via `// oxlint-disable-next-line t3code/no-unreasoned-state-sync -- <why>`.
-- No continuously repainting animations; they peg the GPU on high-refresh displays.
+- No continuously repainting animations; they peg the GPU on high-refresh displays. The one sanctioned exception is the Guild world canvas, and only under the rules in [docs/guild-code/implementation/14_performance-and-reliability.md](docs/guild-code/implementation/14_performance-and-reliability.md) (decision D-006).
 - Security matters, but do not over-index on dev-mode or maintainer-only features. Read [SECURITY.md](SECURITY.md) before auditing or triaging reports.
 - If a rule here fights the task in front of you, say so loudly and get a human sign-off before breaking it.
