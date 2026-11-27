@@ -72,5 +72,6 @@ export const guildHall = {
     { id: "hearth_right", x: 69, kind: "seat", activity: ["available"] },
     { id: "work_left", x: 220, kind: "desk", activity: ["working"] },
     { id: "work_right", x: 273, kind: "desk", activity: ["working"] },
+    { id: "work_long_table", x: 112, kind: "desk", activity: ["working"] },
   ],
 } satisfies SceneDef;

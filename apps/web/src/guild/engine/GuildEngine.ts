@@ -17,7 +17,13 @@ import { VIEW_HEIGHT, VIEW_WIDTH } from "./camera";
 import { GuildInput } from "./input";
 import { interactionPrompt, pickTarget, selectTarget, type InteractionTarget } from "./interaction";
 import { WorldLoop, type FrameScheduler } from "./loop";
-import { drawNpcOverhead, NpcClip, type GuildPresentation, type NpcEntity } from "./npc";
+import {
+  drawNpcOverhead,
+  NpcClip,
+  prepareNpcOverhead,
+  type GuildPresentation,
+  type NpcEntity,
+} from "./npc";
 import { Particles } from "./particles";
 import { Player, TILE } from "./player";
 import { Scene, type DoorDef, type SceneDef, type SceneId } from "./scene";
@@ -103,8 +109,14 @@ export class GuildEngine {
   private offsetY = 0;
   private pointer: { x: number; y: number } | undefined;
   private targets: InteractionTarget[] = [];
-  private npcs: { entity: NpcEntity; sprite: CharacterSprite; clip: NpcClip }[] = [];
-  private presentation: GuildPresentation = { npcs: [] };
+  private npcs: {
+    entity: NpcEntity;
+    sprite: CharacterSprite;
+    clip: NpcClip;
+    overhead: ReturnType<typeof prepareNpcOverhead>;
+  }[] = [];
+  private presentedNpcs: { entity: NpcEntity; overhead: ReturnType<typeof prepareNpcOverhead> }[] =
+    [];
   private nearby: InteractionTarget | undefined;
   private hovered: InteractionTarget | undefined;
   private promptTarget: InteractionTarget | undefined;
@@ -213,7 +225,10 @@ export class GuildEngine {
   }
 
   setPresentation(presentation: GuildPresentation) {
-    this.presentation = presentation;
+    this.presentedNpcs = presentation.npcs.map((entity) => ({
+      entity,
+      overhead: prepareNpcOverhead(entity),
+    }));
     if (!this.scene) return;
     this.loadNpcs(this.scene.def);
     this.updateTarget();
@@ -266,9 +281,9 @@ export class GuildEngine {
 
   private loadNpcs(def: SceneDef) {
     const previous = new Map(this.npcs.map((npc) => [npc.entity.id, npc]));
-    this.npcs = this.presentation.npcs
-      .filter((entity) => entity.sceneId === def.id)
-      .map((entity) => {
+    this.npcs = this.presentedNpcs
+      .filter(({ entity }) => entity.sceneId === def.id)
+      .map(({ entity, overhead }) => {
         const npc = previous.get(entity.id);
         return {
           entity,
@@ -277,6 +292,7 @@ export class GuildEngine {
               ? npc.sprite
               : new CharacterSprite(entity.appearance, this.invalidate),
           clip: npc && npc.entity.clip === entity.clip ? npc.clip : new NpcClip(entity.clip),
+          overhead,
         };
       });
     this.targets = [...def.doors, ...def.interactables, ...this.npcs.map(({ entity }) => entity)];
@@ -483,9 +499,9 @@ export class GuildEngine {
       drawChar(buffer, playerSheet, player.pose(still), player.x - x, player.y - y, player.facing);
     }
     if (!still) this.particles.draw(buffer, x, y);
-    for (const { entity } of this.npcs) {
+    for (const { entity, overhead } of this.npcs) {
       if (entity.x < x || entity.x >= x + VIEW_WIDTH) continue;
-      drawNpcOverhead(buffer, entity, entity.x - x, entity.y - y);
+      drawNpcOverhead(buffer, overhead, entity.x - x, entity.y - y, entity.height);
     }
     if (this.hovered) {
       const { x: anchorX, y: anchorY, width, height } = this.hovered;

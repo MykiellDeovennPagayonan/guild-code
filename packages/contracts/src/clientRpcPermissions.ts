@@ -86,6 +86,7 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.guildRefreshCandidates]: AuthOrchestrationOperateScope,
   [WS_METHODS.guildHireAdventurer]: AuthOrchestrationOperateScope,
   [WS_METHODS.guildStartConversation]: AuthOrchestrationOperateScope,
+  [WS_METHODS.guildContinueConversation]: AuthOrchestrationOperateScope,
   [WS_METHODS.guildEndConversation]: AuthOrchestrationOperateScope,
   [WS_METHODS.scheduledTasksUpsert]: AuthOrchestrationOperateScope,
   [WS_METHODS.scheduledTasksSetEnabled]: AuthOrchestrationOperateScope,

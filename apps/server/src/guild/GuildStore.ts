@@ -249,7 +249,11 @@ const make = Effect.gen(function* () {
     execute: () => sql`
       SELECT a.id, a.name, a.appearance_json, a.class_id, a.binding_json, a.status, a.level,
         COALESCE((
-          SELECT json_object('attemptId', c.id, 'threadId', c.thread_id)
+          SELECT CASE WHEN c.status IN ('starting', 'active', 'paused', 'submitted')
+            THEN json_object('attemptId', c.id, 'threadId', c.thread_id)
+            ELSE json_object('attemptId', c.id, 'threadId', c.thread_id, 'terminal',
+              json_object('status', c.status, 'statusReason', c.status_reason))
+          END
           FROM guild_attempts c
           WHERE c.adventurer_id = a.id AND c.kind = 'conversation'
           ORDER BY c.created_at DESC, c.id DESC LIMIT 1

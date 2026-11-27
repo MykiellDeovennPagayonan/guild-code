@@ -133,6 +133,18 @@ it("groups discovered family aliases, selects the in-family default, and allows 
   ]);
 });
 
+it.each([
+  ["claude-fable-5", "Claude 5", [], "fable"],
+  ["claude-opus-4-5", "Claude 4.5", [], "opus"],
+  ["custom-4-5", "Claude Opus 4.5", [], "opus"],
+  ["custom-5", "Claude 5", ["claude-fable-5"], "fable"],
+  ["opuslike-5", "Claude Opuslike 5", [], "opuslike-5"],
+] as const)("derives the Claude family for %s (%s, %j)", (slug, name, aliases, family) => {
+  expect(deriveFamilies({ ...claude, models: [{ ...sonnet, slug, name, aliases }] })).toMatchObject(
+    [{ key: `claudeAgent:${family}` }],
+  );
+});
+
 it("validates ACP options and returns provider availability reasons", () => {
   const neon = binding(acp, "antigravity-default");
   expect(deriveFamilies(acp).map(({ key }) => key)).toEqual([

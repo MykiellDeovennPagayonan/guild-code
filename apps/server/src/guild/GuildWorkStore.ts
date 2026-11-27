@@ -97,7 +97,12 @@ const AttemptTurnRow = AttemptTurn.mapFields((fields) => ({
 
 const FamilyModels = Schema.Array(Schema.String);
 const OutboxStatus = Schema.Literals(["pending", "running", "done", "failed"]);
-const OutboxNewRow = Schema.Struct({
+const outboxFields = {
+  status: OutboxStatus,
+  createdAt: Attempt.fields.createdAt,
+};
+const OutboxLaunchRow = Schema.Struct({
+  ...outboxFields,
   id: GuildAttemptId,
   kind: Schema.Literal("launch"),
   payload: Schema.fromJsonString(
@@ -110,12 +115,17 @@ const OutboxNewRow = Schema.Struct({
       interactionMode: Adventurer.fields.defaults.fields.interactionMode,
     }),
   ),
-  status: OutboxStatus,
-  createdAt: Attempt.fields.createdAt,
 }).pipe(Schema.encodeKeys({ payload: "payload_json", createdAt: "created_at" }));
+const OutboxContinueRow = Schema.Struct({
+  ...outboxFields,
+  id: CommandId,
+  kind: Schema.Literal("continue"),
+  payload: Schema.fromJsonString(Schema.Struct({ attemptId: GuildAttemptId, text: Schema.String })),
+}).pipe(Schema.encodeKeys({ payload: "payload_json", createdAt: "created_at" }));
+const OutboxNewRow = Schema.Union([OutboxLaunchRow, OutboxContinueRow]);
 
 const OutboxTransition = Schema.Struct({
-  id: GuildAttemptId,
+  id: Schema.String,
   status: OutboxStatus,
   error: Schema.NullOr(Schema.String),
 });
@@ -126,6 +136,8 @@ const LastProject = Schema.Struct({
   at: Attempt.fields.createdAt,
 });
 
+export const continueOutboxId = (id: CommandId) => CommandId.make(`continue:${id}`);
+export const continueCommandId = (id: CommandId) => CommandId.make(`server:guild:${id}`);
 export const launchCommandId = (id: GuildAttemptId) => CommandId.make(`server:guild:launch:${id}`);
 
 const mapError = (operation: string) => (cause: unknown) =>
@@ -155,6 +167,9 @@ export class GuildWorkStore extends Context.Service<
     readonly getLaunchFamilyModels: (
       id: GuildAttemptId,
     ) => Effect.Effect<readonly string[], GuildStoreError>;
+    readonly hasPendingContinuation: (
+      id: GuildAttemptId,
+    ) => Effect.Effect<boolean, GuildStoreError>;
     readonly nextPending: () => Effect.Effect<typeof OutboxNewRow.Type | null, GuildStoreError>;
     readonly listRunning: () => Effect.Effect<
       readonly (typeof OutboxNewRow.Type)[],
@@ -247,18 +262,26 @@ const make = Effect.gen(function* () {
       FROM guild_outbox WHERE id = ${id} AND kind = 'launch'
     `,
   });
+  const hasPendingContinuation = SqlSchema.findOneOption({
+    Request: GuildAttemptId,
+    Result: Schema.Struct({ id: CommandId }),
+    execute: (id) => sql`
+      SELECT id FROM guild_outbox WHERE kind = 'continue' AND status IN ('pending', 'running')
+      AND json_extract(payload_json, '$.attemptId') = ${id} LIMIT 1
+    `,
+  });
   const nextPending = SqlSchema.findOneOption({
     Request: Schema.Void,
     Result: OutboxNewRow,
     execute: () => sql`
-      SELECT * FROM guild_outbox WHERE kind = 'launch' AND status = 'pending'
-      ORDER BY created_at, id LIMIT 1
+      SELECT * FROM guild_outbox WHERE status = 'pending'
+      ORDER BY rowid LIMIT 1
     `,
   });
   const listRunning = SqlSchema.findAll({
     Request: Schema.Void,
     Result: OutboxNewRow,
-    execute: () => sql`SELECT * FROM guild_outbox WHERE kind = 'launch' AND status = 'running'`,
+    execute: () => sql`SELECT * FROM guild_outbox WHERE status = 'running'`,
   });
   const updateOutbox = SqlSchema.void({
     Request: OutboxTransition,
@@ -312,6 +335,11 @@ const make = Effect.gen(function* () {
       getLaunchFamilyModels,
       Effect.map((row) => Option.getOrUndefined(row)?.family_models ?? []),
       Effect.mapError(mapError("getLaunchFamilyModels")),
+    ),
+    hasPendingContinuation: Effect.fn("GuildWorkStore.hasPendingContinuation")(
+      hasPendingContinuation,
+      Effect.map(Option.isSome),
+      Effect.mapError(mapError("hasPendingContinuation")),
     ),
     nextPending: Effect.fn("GuildWorkStore.nextPending")(
       () => nextPending(undefined),

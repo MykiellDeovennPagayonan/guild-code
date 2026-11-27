@@ -1,11 +1,7 @@
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import type { Attempt, GuildAdventurerId, GuildSnapshot } from "@t3tools/contracts/guild";
-import {
-  isOpenAttempt,
-  presentAdventurer,
-  type GuildConnection,
-} from "@t3tools/guild-core/presentation";
+import { presentAdventurer, type GuildConnection } from "@t3tools/guild-core/presentation";
 import { generateCandidate, visibleCandidateIndices } from "@t3tools/guild-core/recruitment";
 
 import type { NpcEntity } from "../engine/npc";
@@ -68,29 +64,25 @@ export function presentGuild(
     if (shell.environmentId === environmentId && !shell.deletedAt) threads.set(shell.id, shell);
   }
   const attempts = new Map<GuildAdventurerId, Attempt[]>();
-  const guildThreads = new Set<ThreadId>();
-  const needsYou: ThreadId[] = [];
-  let needsYouCount = 0;
   for (const attempt of guild?.attempts ?? []) {
     const list = attempts.get(attempt.adventurerId) ?? [];
     if (!attempts.has(attempt.adventurerId)) attempts.set(attempt.adventurerId, list);
     list.push(attempt);
-    if (isOpenAttempt(attempt)) guildThreads.add(attempt.threadId);
   }
-  for (const { latestConversation } of adventurers) {
-    if (latestConversation) guildThreads.add(latestConversation.threadId);
-  }
-  for (const threadId of guildThreads) {
-    const thread = threads.get(threadId);
-    if (!thread || connection !== "live") continue;
-    const approvals = Number(
-      thread.hasPendingApprovals || thread.pendingSubagentRequest === "approval",
-    );
-    const questions = Number(
-      thread.hasPendingUserInput || thread.pendingSubagentRequest === "user_input",
-    );
-    if (approvals || questions) needsYou.push(threadId);
-    needsYouCount += approvals + questions;
+  const needsYou: ThreadId[] = [];
+  let needsYouCount: number | null = connection === "live" ? 0 : null;
+  if (needsYouCount !== null) {
+    for (const [threadId, thread] of threads) {
+      const approvals = Number(
+        thread.hasPendingApprovals || thread.pendingSubagentRequest === "approval",
+      );
+      const questions = Number(
+        thread.hasPendingUserInput || thread.pendingSubagentRequest === "user_input",
+      );
+      const auth = Number(thread.source.pendingRuntimeRequest?.kind === "auth_refresh");
+      if (approvals || questions || auth) needsYou.push(threadId);
+      needsYouCount += approvals + questions + auth;
+    }
   }
   const roster = adventurers.map((adventurer) => {
     const history = (attempts.get(adventurer.id) ?? []).toSorted(
@@ -126,10 +118,7 @@ export function presentGuild(
     available: hall.npcSlots
       .filter(({ activity }) => activity.includes("available"))
       .map(({ x }) => x),
-    working: [
-      ...hall.npcSlots.filter(({ activity }) => activity.includes("working")).map(({ x }) => x),
-      ...hall.props.filter(({ propId }) => propId === "long_table").map(({ x }) => x),
-    ],
+    working: hall.npcSlots.filter(({ activity }) => activity.includes("working")).map(({ x }) => x),
     approval: bell ? [bell.x - 16, bell.x + 16] : [],
     resting: bench ? [bench.x] : [],
   };
@@ -160,11 +149,14 @@ export function presentGuild(
       badgeCount: presentation.badgeCount,
     });
   }
-  const active = roster.filter(({ presentation }) =>
-    presentation.activities.some(
-      ({ state }) => state === "working" || state === "waiting_on_other",
-    ),
-  );
+  const active =
+    connection !== "live"
+      ? null
+      : roster.filter(({ presentation }) =>
+          presentation.activities.some(
+            ({ state }) => state === "working" || state === "waiting_on_other",
+          ),
+        );
   return { npcs, roster, candidates, active, needsYou, needsYouCount, threads };
 }
 

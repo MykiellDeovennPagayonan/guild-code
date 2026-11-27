@@ -5,8 +5,6 @@ import type {
   EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/models";
 import {
-  AuthOrchestrationOperateScope,
-  MessageId,
   type EnvironmentId,
   type ProjectId,
   type ServerProvider,
@@ -14,7 +12,6 @@ import {
 } from "@t3tools/contracts";
 import { GuildBindingError, type Attempt } from "@t3tools/contracts/guild";
 import { resolveBinding } from "@t3tools/guild-core/binding";
-import { familyIncludesModel } from "@t3tools/guild-core/families";
 import { isOpenAttempt, type GuildConnection } from "@t3tools/guild-core/presentation";
 import { AsyncResult } from "effect/reactivity";
 import { useState } from "react";
@@ -22,11 +19,7 @@ import { useState } from "react";
 import { Button } from "../../../components/ui/button";
 import { Label } from "../../../components/ui/label";
 import { Textarea } from "../../../components/ui/textarea";
-import { randomUUID } from "../../../lib/utils";
-import { useEnvironmentScope } from "../../../state/session";
-import { threadEnvironment } from "../../../state/threads";
 import { useAtomCommand } from "../../../state/use-atom-command";
-import { useOrchestrationCommand } from "../../../state/use-orchestration-command";
 import { guildCommandError, guildCommandId, guildEnvironment } from "../../state/guild";
 import type { GuildRosterEntry } from "../../state/presentation";
 import { AdventurerIdentity, ProviderBindingIssue } from "../AdventurerIdentity";
@@ -65,23 +58,11 @@ export function AdventurerDialogue({
     }),
   );
   const latestConversation = adventurer.latestConversation;
-  const latestPage = useAtomValue(
-    guildEnvironment.attempts({
-      environmentId,
-      input: { adventurerId: adventurer.id },
-    }),
-  );
-  const latest = latestConversation
-    ? (history.find(({ id }) => id === latestConversation.attemptId) ??
-      AsyncResult.getOrElse(latestPage, () => undefined)?.attempts.find(
-        ({ id }) => id === latestConversation.attemptId,
-      ))
-    : undefined;
   const currentAttempt = history.find(
     (attempt) => attempt.kind === "conversation" && isOpenAttempt(attempt),
   );
-  const attempt = currentAttempt ?? latest;
-  const thread = attempt ? threads.get(attempt.threadId) : undefined;
+  const threadId = currentAttempt?.threadId ?? latestConversation?.threadId;
+  const thread = threadId ? threads.get(threadId) : undefined;
   const profileAdventurer = AsyncResult.getOrElse(profile, () => undefined)?.adventurer;
   const provider = providers.find(({ instanceId }) => instanceId === binding.providerInstanceId);
   const resolution = resolveBinding(
@@ -90,18 +71,16 @@ export function AdventurerDialogue({
   );
   const bindingError = "error" in resolution ? resolution.error.reason : null;
   const preview = thread?.source.latestVisibleMessage;
-  const available =
-    presentation.state === "available" ||
-    presentation.state === "idle" ||
-    presentation.state === "stopped";
   const [form, setForm] = useState<"orders" | "continue" | null>(null);
   const action = useGuildAction();
   const canEnd = useAtomValue(guildEnvironment.endConversation.permissionAtom(environmentId));
   const canStart = useAtomValue(guildEnvironment.startConversation.permissionAtom(environmentId));
-  const canContinue = useEnvironmentScope(environmentId, AuthOrchestrationOperateScope);
+  const canContinue = useAtomValue(
+    guildEnvironment.continueConversation.permissionAtom(environmentId),
+  );
   const end = useAtomCommand(guildEnvironment.endConversation, { reportFailure: false });
   const start = useAtomCommand(guildEnvironment.startConversation, { reportFailure: false });
-  const continueTurn = useOrchestrationCommand(threadEnvironment.startTurn, {
+  const continueConversation = useAtomCommand(guildEnvironment.continueConversation, {
     reportFailure: false,
   });
 
@@ -120,33 +99,10 @@ export function AdventurerDialogue({
           },
         });
         if (result._tag === "Failure") throw guildCommandError(result);
-      } else if (form === "continue" && currentAttempt && thread && profileAdventurer) {
-        const current = resolveBinding(profileAdventurer.binding, providers);
-        if ("error" in current) throw new GuildBindingError(current.error);
-        const sameBinding =
-          thread.modelSelection.instanceId === binding.providerInstanceId &&
-          (binding.pinnedModel
-            ? binding.pinnedModel === thread.modelSelection.model
-            : familyIncludesModel(binding.family.key, thread.modelSelection.model, provider));
-        if (!sameBinding) {
-          throw new Error(
-            "The conversation is using a different model binding. Open the conversation to check its model.",
-          );
-        }
-        const result = await continueTurn({
+      } else if (form === "continue" && currentAttempt?.status === "active") {
+        const result = await continueConversation({
           environmentId,
-          input: {
-            threadId: currentAttempt.threadId,
-            message: {
-              messageId: MessageId.make(randomUUID()),
-              role: "user",
-              text: message,
-              attachments: [],
-            },
-            runtimeMode: thread.runtimeMode,
-            interactionMode: thread.interactionMode,
-            dispatchMode: "queue",
-          },
+          input: { commandId: guildCommandId(), attemptId: currentAttempt.id, message },
         });
         if (result._tag === "Failure") throw guildCommandError(result);
       } else return;
@@ -167,12 +123,37 @@ export function AdventurerDialogue({
   const messageEnabled =
     form === "orders"
       ? canStart && Boolean(profileAdventurer) && !currentAttempt
-      : canContinue && Boolean(currentAttempt && thread && profileAdventurer);
+      : canContinue && currentAttempt?.status === "active";
   const providerError = isGuildBindingError(action.error)
     ? action.error.reason
     : live
       ? bindingError
       : null;
+
+  let availability: string;
+  switch (presentation.state) {
+    case "unknown":
+      availability = connection === "offline" ? "Offline" : "Status unknown";
+      break;
+    case "awaiting_approval":
+    case "awaiting_input":
+    case "awaiting_auth":
+      availability = "Needs you";
+      break;
+    case "working":
+    case "waiting_on_other":
+      availability = "Working";
+      break;
+    default:
+      availability = currentAttempt
+        ? "In a conversation"
+        : bindingError
+          ? "Model binding unavailable"
+          : "Available";
+  }
+  const statusLine = presentation.state === "available" ? availability : presentation.statusLine;
+  const terminal = latestConversation?.terminal;
+  const sendError = currentAttempt?.status === "active" ? currentAttempt.statusReason : null;
 
   return (
     <GuildOverlay title={adventurer.name} onClose={onClose}>
@@ -185,17 +166,20 @@ export function AdventurerDialogue({
             family={binding.family.label}
             pin={binding.pinnedModel}
           />
-          <p className="mt-1 text-sm">
-            {live ? (available && !bindingError ? "Available" : "Unavailable") : "Offline"}
-          </p>
+          <p className="mt-1 text-sm">{availability}</p>
         </div>
       </div>
       <div className="mb-4 grid gap-2 rounded-lg border p-3 text-sm wrap-break-word">
         <p className="text-muted-foreground">No quest · conversation</p>
-        <p role="status">{presentation.statusLine}</p>
-        {latest?.status === "failed" && !currentAttempt && presentation.state !== "failed" && (
-          <p className="text-destructive">
-            {latest.statusReason ?? "The conversation failed to start."}
+        <p role="status">{statusLine}</p>
+        {terminal?.status === "failed" && !currentAttempt && (
+          <p role="alert" className="text-destructive">
+            {terminal.statusReason ?? "The conversation failed to start."}
+          </p>
+        )}
+        {sendError && (
+          <p role="alert" className="text-destructive">
+            {sendError}
           </p>
         )}
         {preview?.role === "assistant" && preview.text.trim() ? (
@@ -265,8 +249,7 @@ export function AdventurerDialogue({
               disabled={
                 !live ||
                 !canContinue ||
-                !thread ||
-                !profileAdventurer ||
+                currentAttempt.status !== "active" ||
                 Boolean(bindingError) ||
                 action.pending
               }
@@ -284,8 +267,8 @@ export function AdventurerDialogue({
               Give orders
             </Button>
           ))}
-        {attempt && (thread || attempt.status === "starting" || attempt.status === "active") && (
-          <Button variant="outline" onClick={() => openThread(attempt.threadId)}>
+        {threadId && (thread || currentAttempt) && (
+          <Button variant="outline" onClick={() => openThread(threadId)}>
             Open conversation
           </Button>
         )}

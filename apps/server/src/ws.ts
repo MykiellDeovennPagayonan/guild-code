@@ -2089,8 +2089,23 @@ export const layerWsRpc = (
               Effect.provideService(ProjectStore.ProjectStoreV2, projectStore),
               Effect.mapError(guildRpcError),
             ),
+        [WS_METHODS.guildContinueConversation]: (input) =>
+          guild
+            .continueConversation(input)
+            .pipe(
+              Effect.provideService(ProviderRegistry.ProviderRegistry, providerRegistry),
+              Effect.mapError(guildRpcError),
+            ),
         [WS_METHODS.guildEndConversation]: (input) =>
-          guild.endConversation(input).pipe(Effect.mapError(guildRpcError)),
+          guild
+            .endConversation(input)
+            .pipe(
+              Effect.provideService(
+                ThreadManagementService.ThreadManagementService,
+                threadManagement,
+              ),
+              Effect.mapError(guildRpcError),
+            ),
       });
       const handlers = T3WsRpcGroup.of({
         [WS_METHODS.issuesList]: (input) => issues.list(input),

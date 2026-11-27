@@ -13,13 +13,17 @@ export function GuildHud({
   connection,
   active,
   needsYou,
+  popoverOpen,
+  onPopoverOpenChange,
   onNeedsYou,
   onRoster,
   onAdventurer,
 }: {
   connection: GuildConnection;
-  active: readonly GuildRosterEntry[];
-  needsYou: number;
+  active: readonly GuildRosterEntry[] | null;
+  needsYou: number | null;
+  popoverOpen: boolean;
+  onPopoverOpenChange: (open: boolean) => void;
   onNeedsYou: () => void;
   onRoster: () => void;
   onAdventurer: (entry: GuildRosterEntry) => void;
@@ -30,13 +34,15 @@ export function GuildHud({
         Connection ·{" "}
         {connection === "live" ? "Live" : connection === "stale" ? "Reconnecting" : "Offline"}
       </span>
-      <Popover>
+      <Popover open={popoverOpen} onOpenChange={onPopoverOpenChange}>
         <PopoverTrigger render={<Button variant="secondary" size="sm" />}>
-          Active · {active.length}
+          Active · {active?.length ?? "Unknown"}
         </PopoverTrigger>
         <PopoverPopup align="start">
           <PopoverTitle>Active adventurers</PopoverTitle>
-          {active.length === 0 ? (
+          {active === null ? (
+            <p className="text-sm text-muted-foreground">Active work is unknown.</p>
+          ) : active.length === 0 ? (
             <p className="text-sm text-muted-foreground">No active work.</p>
           ) : (
             <ul className="grid gap-2">
@@ -55,12 +61,12 @@ export function GuildHud({
         </PopoverPopup>
       </Popover>
       <Button
-        variant={needsYou > 0 ? "default" : "secondary"}
+        variant={needsYou ? "default" : "secondary"}
         size="sm"
-        disabled={needsYou === 0}
+        disabled={!needsYou}
         onClick={onNeedsYou}
       >
-        Needs you · {needsYou}
+        Needs you · {needsYou ?? "Unknown"}
       </Button>
       <Button variant="secondary" size="sm" onClick={onRoster}>
         Roster

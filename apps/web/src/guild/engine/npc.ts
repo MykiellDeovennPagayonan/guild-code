@@ -61,18 +61,26 @@ function markerImage(id: MarkerId) {
   return context.canvas;
 }
 
+export function prepareNpcOverhead(entity: NpcEntity) {
+  const name = entity.name.toUpperCase();
+  const plate = entity.badgeCount ? `${name} x${entity.badgeCount}` : name;
+  return {
+    plate,
+    width: textWidth(plate),
+    marker: entity.marker ? markerImage(entity.marker) : null,
+  };
+}
+
 export function drawNpcOverhead(
   context: CanvasRenderingContext2D,
-  entity: NpcEntity,
+  overhead: ReturnType<typeof prepareNpcOverhead>,
   x: number,
   y: number,
+  height: number,
 ) {
   const center = Math.round(x);
-  const top = Math.round(y) - entity.height;
-  const name = entity.name.toUpperCase();
-  const badge = entity.badgeCount ? `x${entity.badgeCount}` : "";
-  const plate = badge ? `${name} ${badge}` : name;
-  const width = textWidth(plate);
+  const top = Math.round(y) - height;
+  const { plate, width, marker } = overhead;
   const left = Math.max(
     1,
     Math.min(context.canvas.width - width - 2, center - Math.floor(width / 2)),
@@ -80,7 +88,6 @@ export function drawNpcOverhead(
   context.fillStyle = "#16101c";
   context.fillRect(left - 2, top - 8, width + 4, 8);
   drawText(context, plate, left, top - 7);
-  if (!entity.marker) return;
-  const marker = markerImage(entity.marker);
-  context.drawImage(marker, center - Math.floor(marker.width / 2), top - marker.height - 10);
+  if (marker)
+    context.drawImage(marker, center - Math.floor(marker.width / 2), top - marker.height - 10);
 }

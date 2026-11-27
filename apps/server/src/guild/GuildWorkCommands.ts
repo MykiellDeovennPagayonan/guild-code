@@ -9,6 +9,7 @@ import {
   type GuildCommandConflictError,
   type GuildCommandRejection,
   GuildConversationError,
+  type GuildContinueConversationInput,
   type GuildDelta,
   type GuildEndConversationInput,
   type GuildHireAdventurerInput,
@@ -16,6 +17,7 @@ import {
 } from "@t3tools/contracts/guild";
 import { resolveBinding } from "@t3tools/guild-core/binding";
 import { deriveFamilies } from "@t3tools/guild-core/families";
+import { isOpenAttempt } from "@t3tools/guild-core/presentation";
 import { guildBriefing } from "@t3tools/guild-core/briefing";
 import { transitionConversation } from "@t3tools/guild-core/lifecycle/attempt";
 import { generateCandidate, visibleCandidateNames } from "@t3tools/guild-core/recruitment";
@@ -26,6 +28,7 @@ import * as Option from "effect/Option";
 import type * as Schema from "effect/Schema";
 
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
+import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
 import { toPersistenceSqlError } from "../persistence/Errors.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
 import * as GuildStore from "./GuildStore.ts";
@@ -64,23 +67,44 @@ function summarize(adventurer: Adventurer, latest: Attempt | null) {
     level,
     binding: { providerInstanceId, family, pinnedModel },
     latestConversation:
-      latest === null ? null : { attemptId: latest.id, threadId: latest.threadId },
+      latest === null
+        ? null
+        : {
+            attemptId: latest.id,
+            threadId: latest.threadId,
+            ...(!isOpenAttempt(latest) && {
+              terminal: { status: latest.status, statusReason: latest.statusReason },
+            }),
+          },
   };
 }
 
-export function attemptActivity(before: Attempt | null, after: Attempt) {
-  const live = after.status === "starting" || after.status === "active";
+export const attemptActivity = Effect.fn("GuildWorkCommands.attemptActivity")(function* (
+  before: Attempt | null,
+  after: Attempt,
+  store: GuildStore.GuildStore["Service"],
+  work: GuildWorkStore.GuildWorkStore["Service"],
+) {
+  const live = isOpenAttempt(after);
+  const upserts: GuildDelta["upserts"][number][] = live ? [{ _tag: "attempt", value: after }] : [];
+  if (!live && after.kind === "conversation" && before?.status !== after.status) {
+    const latest = yield* work.getLatestConversation(after.adventurerId);
+    if (latest?.id === after.id) {
+      const adventurer = yield* store.getAdventurer(after.adventurerId);
+      if (adventurer) upserts.push({ _tag: "adventurer", value: summarize(adventurer, latest) });
+    }
+  }
   return {
     entity: "attempt",
     entityId: after.id,
     before,
     after,
     delta: {
-      upserts: live ? [{ _tag: "attempt", value: after }] : [],
+      upserts,
       removals: live ? [] : [{ entity: "attempt", id: after.id }],
     } satisfies GuildDelta,
   };
-}
+});
 
 export const makeWorkCommands = Effect.fn("GuildWorkCommands.make")(function* (mutate: Mutate) {
   const store = yield* GuildStore.GuildStore;
@@ -259,7 +283,7 @@ export const makeWorkCommands = Effect.fn("GuildWorkCommands.make")(function* (m
           return {
             value,
             activity: [
-              attemptActivity(null, value),
+              yield* attemptActivity(null, value, store, work),
               {
                 entity: "adventurer",
                 entityId: adventurer.id,
@@ -272,6 +296,33 @@ export const makeWorkCommands = Effect.fn("GuildWorkCommands.make")(function* (m
               },
             ],
           };
+        }),
+      ),
+  );
+
+  const continueConversation = Effect.fn("GuildService.continueConversation")(
+    (input: GuildContinueConversationInput) =>
+      mutate(input.commandId, "continueConversation", Attempt, (at) =>
+        Effect.gen(function* () {
+          const attempt = yield* work.getAttempt(input.attemptId);
+          if (attempt?.kind !== "conversation" || attempt.status !== "active") {
+            return yield* new GuildConversationError({ code: "conversation_not_active" });
+          }
+          const adventurer = yield* store.getAdventurer(attempt.adventurerId);
+          if (adventurer?.status !== "active") {
+            return yield* new GuildConversationError({ code: "adventurer_unavailable" });
+          }
+          const registry = yield* ProviderRegistry.ProviderRegistry;
+          const resolution = resolveBinding(adventurer.binding, yield* registry.getProviders);
+          if ("error" in resolution) return yield* new GuildBindingError(resolution.error);
+          yield* work.enqueue({
+            id: GuildWorkStore.continueOutboxId(input.commandId),
+            kind: "continue",
+            status: "pending",
+            createdAt: at,
+            payload: { attemptId: attempt.id, text: input.message },
+          });
+          return { value: attempt, activity: [] };
         }),
       ),
   );
@@ -289,11 +340,30 @@ export const makeWorkCommands = Effect.fn("GuildWorkCommands.make")(function* (m
           if (value === before) {
             return yield* new GuildConversationError({ code: "conversation_not_active" });
           }
+          const threads = yield* ThreadManagement.ThreadManagementService;
+          const shell = yield* threads
+            .getThreadShell(before.threadId)
+            .pipe(Effect.mapError(toPersistenceSqlError("GuildService.endConversation.thread")));
+          if (shell?.pendingRuntimeRequest) {
+            return yield* new GuildConversationError({ code: "conversation_needs_attention" });
+          }
+          if (
+            (shell &&
+              (shell.activeRunId !== null ||
+                shell.activityRunStatus != null ||
+                shell.status === "queued" ||
+                shell.status === "preparing" ||
+                shell.status === "running" ||
+                shell.status === "waiting")) ||
+            (yield* work.hasPendingContinuation(before.id))
+          ) {
+            return yield* new GuildConversationError({ code: "conversation_busy" });
+          }
           yield* work.saveAttempt(value);
-          return { value, activity: [attemptActivity(before, value)] };
+          return { value, activity: [yield* attemptActivity(before, value, store, work)] };
         }),
       ),
   );
 
-  return { hireAdventurer, startConversation, endConversation };
+  return { hireAdventurer, startConversation, continueConversation, endConversation };
 });

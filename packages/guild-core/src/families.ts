@@ -3,11 +3,16 @@ import type { ServerProvider, ServerProviderModel } from "@t3tools/contracts";
 const claudeFamilyAliases = ["opus", "sonnet", "haiku", "fable"];
 
 function modelFamilies(driver: string, model: ServerProviderModel) {
-  const names = [model.slug, ...(model.aliases ?? [])];
+  const names = [model.slug, ...(model.aliases ?? []), model.name];
   const claudeAliases =
     driver === "claudeAgent"
       ? claudeFamilyAliases.filter((alias) =>
-          names.some((name) => name === alias || name.startsWith(`${alias}-`)),
+          names.some((name) =>
+            name
+              .toLowerCase()
+              .split(/[^a-z0-9]+/)
+              .includes(alias),
+          ),
         )
       : [];
   const aliases =

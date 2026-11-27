@@ -125,6 +125,7 @@ const RPC_AGGREGATES = {
   [WS_METHODS.guildListAttempts]: "guild",
   [WS_METHODS.guildHireAdventurer]: "guild",
   [WS_METHODS.guildStartConversation]: "guild",
+  [WS_METHODS.guildContinueConversation]: "guild",
   [WS_METHODS.guildEndConversation]: "guild",
   [WS_METHODS.scheduledTasksSubscribe]: "scheduledTasks",
   [WS_METHODS.scheduledTasksUpsert]: "scheduledTasks",

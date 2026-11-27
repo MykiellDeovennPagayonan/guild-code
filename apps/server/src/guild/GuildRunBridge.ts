@@ -94,7 +94,7 @@ const make = Effect.gen(function* () {
     const value = { ...after, executedModels: [...before.executedModels, ...added] };
     yield* work.saveAttempt(value);
     yield* store.appendActivity({
-      ...attemptActivity(before, value),
+      ...(yield* attemptActivity(before, value, store, work)),
       at,
       change: "reconcile_attempt",
       actor: "system",

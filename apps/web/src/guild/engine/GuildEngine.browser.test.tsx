@@ -89,6 +89,33 @@ describe("Guild world in Chromium", () => {
     key(window, "keyup", "KeyD");
   });
 
+  it("rasterizes markers when the presentation arrives before mounting or drawing the world", () => {
+    using rasterize = vi.spyOn(CanvasRenderingContext2D.prototype, "putImageData");
+    const scheduler = new ManualFrames();
+    const engine = new GuildEngine({ scheduler });
+    engine.setPresentation({
+      npcs: [
+        {
+          kind: "npc",
+          id: "marker-test",
+          name: "Bram",
+          sceneId: "guild_hall",
+          x: 24,
+          y: 180,
+          width: 22,
+          height: 28,
+          facing: 1,
+          appearance: DEFAULT_APPEARANCE,
+          clip: "idle",
+          marker: "zzz",
+          badgeCount: 2,
+        },
+      ],
+    });
+    expect(rasterize).toHaveBeenCalledOnce();
+    expect(scheduler.ran).toBe(0);
+  });
+
   it("cancels the pending frame on document blur or hide and clears held keys", async () => {
     await using screen = await render(
       <div>

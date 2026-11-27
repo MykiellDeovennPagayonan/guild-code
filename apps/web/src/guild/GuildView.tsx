@@ -8,7 +8,7 @@ import type { AtomRegistry } from "effect/reactivity";
 import { useContext, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { Button } from "../components/ui/button";
-import { useProjects, useQuietThreadShells } from "../state/entities";
+import { useProjects } from "../state/entities";
 import {
   useEnvironment,
   useEnvironmentProviders,
@@ -22,6 +22,7 @@ import {
   guildEnvironment,
   guildMasterAtom,
   guildSnapshotAtom,
+  guildThreadShellsAtom,
 } from "./state/guild";
 import { candidateId, presentGuild, type Candidate } from "./state/presentation";
 import { MasterCreator } from "./ui/creator/MasterCreator";
@@ -101,11 +102,12 @@ function GuildWorld({
   const masterAtom = guildMasterAtom(environmentId);
   const snapshot = useAtomValue(guildSnapshotAtom(environmentId));
   const master = snapshot?.master;
-  const shells = useQuietThreadShells();
+  const shells = useAtomValue(guildThreadShellsAtom(environmentId));
+  const guildSynchronized = useAtomValue(guildEnvironment.synchronized(environmentId));
   const phase = useEnvironment(environmentId)?.connection.phase;
   const shellStatus = useEnvironmentShellStatus(environmentId);
   const connection: GuildConnection =
-    phase === "connected" && shellStatus === "live"
+    phase === "connected" && shellStatus === "live" && guildSynchronized
       ? "live"
       : phase === "connected" || phase === "connecting" || phase === "reconnecting"
         ? "stale"
@@ -119,6 +121,7 @@ function GuildWorld({
   const [creatorDismissed, setCreatorDismissed] = useState(false);
   const [scene, setScene] = useState(() => master?.location.sceneId ?? "guild_hall");
   const [paused, setPaused] = useState(false);
+  const [hudPopoverOpen, setHudPopoverOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const promptRef = useRef<HTMLSpanElement>(null);
   const engineRef = useRef<GuildEngine>(null);
@@ -135,7 +138,7 @@ function GuildWorld({
     activeOverlay && "adventurerId" in activeOverlay
       ? world.roster.find(({ adventurer }) => adventurer.id === activeOverlay.adventurerId)
       : undefined;
-  const inputEnabled = Boolean(master) && activeOverlay === null;
+  const inputEnabled = Boolean(master) && activeOverlay === null && !hudPopoverOpen;
 
   const openThread = (threadId: ThreadId) => {
     void navigate({
@@ -232,13 +235,19 @@ function GuildWorld({
           connection={connection}
           active={world.active}
           needsYou={world.needsYouCount}
+          popoverOpen={hudPopoverOpen}
+          onPopoverOpenChange={(open) => {
+            if (open) engineRef.current?.setInputEnabled(false);
+            setHudPopoverOpen(open);
+          }}
           onNeedsYou={() => {
             const threadId = world.needsYou[0];
             if (threadId) openThread(threadId);
           }}
-          onAdventurer={({ adventurer }) =>
-            openOverlay({ kind: "dialogue", adventurerId: adventurer.id })
-          }
+          onAdventurer={({ adventurer }) => {
+            setHudPopoverOpen(false);
+            openOverlay({ kind: "dialogue", adventurerId: adventurer.id });
+          }}
           onRoster={() => openOverlay({ kind: "roster" })}
         />
         <div className="flex flex-wrap items-center justify-end gap-2">

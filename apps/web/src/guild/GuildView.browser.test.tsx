@@ -12,6 +12,7 @@ import {
   GuildAttemptId,
   type Adventurer,
   type Attempt,
+  type GuildContinueConversationInput,
   type GuildCreateMasterInput,
   type GuildHireAdventurerInput,
   type GuildMaster,
@@ -25,6 +26,7 @@ import { generateCandidate } from "@t3tools/guild-core/recruitment";
 import type * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
 import { expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
@@ -39,6 +41,7 @@ import { startMainAppLocationTracking } from "../components/sidebar/mainAppLocat
 import { installCommandPaletteCommands } from "../shortcuts/commandPaletteCommands";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { getRouter } from "../router";
+import { environmentThreadShells } from "../state/threads";
 import {
   CODEX_PROVIDER,
   ENVIRONMENT_ID,
@@ -46,6 +49,7 @@ import {
   answerRpc,
   dispatchedCommands,
   emitThreadShell,
+  fakeDriver,
   installFakeEnvironment,
   threadWithHistory,
   type FakeDriver,
@@ -135,12 +139,16 @@ function fixtures({
   threads = [],
   attempts = [],
   includeAdventurer = false,
+  additionalAdventurers = [],
+  synchronize = true,
   providers = [{ ...CODEX_PROVIDER, displayName: "Codex" }],
 }: {
   identity?: GuildMaster | null;
   threads?: readonly FakeThread[];
   attempts?: readonly Attempt[];
   includeAdventurer?: boolean;
+  additionalAdventurers?: readonly Adventurer[];
+  synchronize?: boolean;
   providers?: readonly unknown[];
 } = {}) {
   __setClientSettingsForTests({ ...DEFAULT_CLIENT_SETTINGS, onboardingCompletedAt: at });
@@ -161,22 +169,28 @@ function fixtures({
   const snapshot: GuildSnapshot = {
     master: identity,
     settings,
-    adventurers:
-      first || includeAdventurer
-        ? [
-            {
-              ...adventurer,
-              latestConversation: first ? { attemptId: first.id, threadId: first.threadId } : null,
-            },
-          ]
-        : [],
+    adventurers: [
+      ...(first || includeAdventurer ? [adventurer] : []),
+      ...additionalAdventurers,
+    ].map((member) => {
+      const attempt = attempts.find(({ adventurerId }) => adventurerId === member.id);
+      return {
+        ...member,
+        latestConversation: attempt ? { attemptId: attempt.id, threadId: attempt.threadId } : null,
+      };
+    }),
     attempts,
+    attemptThreadIds: attempts.map(({ threadId }) => threadId),
   };
+  let updates: Queue.Enqueue<GuildStreamItem> | undefined;
   stack.use(
     answerRpc(WS_METHODS.guildSubscribe, () =>
-      Stream.concat(
-        Stream.make({ _tag: "snapshot", sequence: 1, guild: snapshot } satisfies GuildStreamItem),
-        Stream.never,
+      Stream.callback<GuildStreamItem>((queue) =>
+        Effect.sync(() => {
+          updates = queue;
+          Queue.offerUnsafe(queue, { _tag: "snapshot", sequence: 1, guild: snapshot });
+          if (synchronize) Queue.offerUnsafe(queue, { _tag: "synchronized", sequence: 1 });
+        }),
       ),
     ),
   );
@@ -199,7 +213,19 @@ function fixtures({
     Effect.succeed(attemptFor(threadWithHistory("guild-launched", 0).id)),
   );
   stack.use(answerRpc(WS_METHODS.guildStartConversation, started));
-  return { created, hired, launched, started, [Symbol.dispose]: () => stack.dispose() };
+  const continued = vi.fn((_: GuildContinueConversationInput) => Effect.succeed(first));
+  stack.use(answerRpc(WS_METHODS.guildContinueConversation, continued));
+  return {
+    created,
+    hired,
+    launched,
+    started,
+    continued,
+    emit: (item: GuildStreamItem) => {
+      if (!updates || !Queue.offerUnsafe(updates, item)) throw new Error("Guild stream is closed.");
+    },
+    [Symbol.dispose]: () => stack.dispose(),
+  };
 }
 
 function guildRouter(path = "/guild") {
@@ -351,7 +377,8 @@ it("draws working, approval, question and disconnected NPC states and routes the
     shell: { status: "running" as const, activityRunStatus: "running" as const },
   };
   const other = threadWithHistory("regular-thread", 1);
-  using _fixture = fixtures({ threads: [other, running], attempts: [attemptFor(thread.id)] });
+  const attempt = attemptFor(thread.id);
+  using fixture = fixtures({ threads: [other, running], attempts: [attempt] });
   using present = vi.spyOn(GuildEngine.prototype, "setPresentation");
   const router = guildRouter();
   // AppRoot brings its own router.
@@ -391,10 +418,60 @@ it("draws working, approval, question and disconnected NPC states and routes the
     ...running,
     shell: { ...running.shell, pendingRuntimeRequest: pending("command") },
   });
+  await expect.element(page.getByRole("button", { name: "Needs you · 1" })).toBeEnabled();
+  const next = attemptFor(other.id);
+  fixture.emit({
+    _tag: "changed",
+    sequence: 2,
+    removals: [{ entity: "attempt", id: attempt.id }],
+    upserts: [
+      { _tag: "attempt", value: next },
+      {
+        _tag: "adventurer",
+        value: {
+          ...adventurer,
+          latestConversation: { attemptId: next.id, threadId: next.threadId },
+        },
+      },
+    ],
+  });
+  await expect.element(page.getByRole("button", { name: "Active · 0" })).toBeVisible();
   await page.getByRole("button", { name: "Needs you · 1" }).click();
   await vi.waitFor(() =>
     expect(router.state.location.pathname).toBe(`/${ENVIRONMENT_ID}/${thread.id}`),
   );
+});
+
+it("seats three working adventurers at their scene's work-table slots", async () => {
+  const additionalAdventurers = ["Mira", "Elowen"].map((name) => ({
+    ...adventurer,
+    id: GuildAdventurerId.make(name),
+    name,
+  }));
+  const members = [adventurer, ...additionalAdventurers];
+  const threads = members.map(({ name }) => ({
+    ...threadWithHistory(name, 1),
+    shell: { status: "running" as const, activityRunStatus: "running" as const },
+  }));
+  using _fixture = fixtures({
+    threads,
+    additionalAdventurers,
+    attempts: threads.map((thread, index) => ({
+      ...attemptFor(thread.id),
+      adventurerId: members[index]!.id,
+    })),
+  });
+  using present = vi.spyOn(GuildEngine.prototype, "setPresentation");
+  // AppRoot brings its own router.
+  await using _app = await render(<AppRoot router={guildRouter()} />, {
+    router: false,
+    container: guildViewport(),
+  });
+  await expect.element(page.getByRole("button", { name: "Active · 3" })).toBeVisible();
+  const seatPositions = present.mock.lastCall?.[0].npcs
+    .filter((npc) => npc.sceneId === "guild_hall")
+    .map(({ x }) => x);
+  expect(seatPositions).toEqual([220, 273, 112]);
 });
 
 it("keeps a thread's running attempt and composer draft when toggling Guild", async () => {
@@ -510,26 +587,107 @@ it("gives orders in the last project with an explicitly chosen worktree", async 
       workspace: "worktree",
     }),
   );
+  const attempt = attemptFor(threadWithHistory("guild-launched", 0).id);
+  fixture.emit({
+    _tag: "changed",
+    sequence: 2,
+    removals: [],
+    upserts: [{ _tag: "attempt", value: { ...attempt, status: "starting" } }],
+  });
+  await expect.element(page.getByRole("status").filter({ hasText: "Starting…" })).toBeVisible();
+  const reason = "Could not read a current project branch for the new worktree.";
+  const latestConversation = {
+    attemptId: attempt.id,
+    threadId: attempt.threadId,
+    terminal: { status: "failed" as const, statusReason: reason },
+  };
+  fixture.emit({
+    _tag: "changed",
+    sequence: 3,
+    removals: [{ entity: "attempt", id: attempt.id }],
+    upserts: [{ _tag: "adventurer", value: { ...adventurer, latestConversation } }],
+  });
+  await expect.element(send).toBeEnabled();
+  await expect.element(page.getByText(reason)).toBeVisible();
 });
 
-it("continues the recorded attempt without sending a new model selection", async () => {
-  const thread = threadWithHistory("guild-continue", 1);
-  using fixture = fixtures({ threads: [thread], attempts: [attemptFor(thread.id)] });
+it("continues a tag-hidden conversation through Guild even if focus mode selected another model", async () => {
+  const thread = {
+    ...threadWithHistory("guild-continue", 1),
+    modelSelection: { instanceId: providerId, model: "gpt-5.5" },
+    shell: { tags: ["private"] },
+  };
+  const attempt = attemptFor(thread.id);
+  using fixture = fixtures({ threads: [thread], attempts: [attempt] });
+  const connect = fakeDriver.connect;
+  using _connection = vi.spyOn(fakeDriver, "connect").mockImplementation((entry) =>
+    connect(entry).pipe(
+      Effect.map((lease) => ({
+        ...lease,
+        session: {
+          ...lease.session,
+          initialConfig: lease.session.initialConfig.pipe(
+            Effect.map((config) => ({
+              ...config,
+              settings: {
+                ...config.settings,
+                hideTaggedThreads: true,
+                hiddenThreadTags: ["private"],
+              },
+            })),
+          ),
+          subscribeServerConfig: () => Stream.never,
+        },
+      })),
+    ),
+  );
   const router = guildRouter(`/guild?adventurerId=${adventurer.id}`);
   // AppRoot brings its own router.
   await using _app = await render(<AppRoot router={router} />, {
     router: false,
     container: guildViewport(),
   });
+  await vi.waitFor(() =>
+    expect(appAtomRegistry.get(environmentThreadShells.hiddenThreadKeysAtom).size).toBe(1),
+  );
+  await expect.element(page.getByText("In a conversation", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.getByRole("textbox", { name: "Message", exact: true }).fill("Check the login test.");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
-  await vi.waitFor(() => {
-    const messages = dispatchedCommands().filter(({ type }) => type === "message.dispatch");
-    expect(messages).toHaveLength(1);
-    expect(messages[0]).toMatchObject({ threadId: thread.id, text: "Check the login test." });
-    expect(messages[0]).not.toHaveProperty("modelSelection");
-  });
+  await vi.waitFor(() =>
+    expect(fixture.continued).toHaveBeenCalledWith({
+      commandId: expect.any(String),
+      attemptId: attempt.id,
+      message: "Check the login test.",
+    }),
+  );
   expect(fixture.launched).not.toHaveBeenCalled();
   expect(fixture.started).not.toHaveBeenCalled();
+  expect(dispatchedCommands().map(({ type }) => type)).not.toContain("message.dispatch");
+});
+
+it("keeps HUD counts unknown until the Guild stream synchronizes and suspends input in a popover", async () => {
+  using fixture = fixtures({ synchronize: false });
+  // AppRoot brings its own router.
+  await using _app = await render(<AppRoot router={guildRouter()} />, {
+    router: false,
+    container: guildViewport(),
+  });
+  await expect.element(page.getByRole("button", { name: "Active · Unknown" })).toBeVisible();
+  await expect.element(page.getByRole("button", { name: "Needs you · Unknown" })).toBeDisabled();
+  fixture.emit({ _tag: "synchronized", sequence: 1 });
+  const active = page.getByRole("button", { name: "Active · 0" });
+  await active.click();
+  const popup = page.getByRole("dialog", { name: "Active adventurers" });
+  await expect.element(popup).toBeVisible();
+  const move = new KeyboardEvent("keydown", {
+    key: "d",
+    code: "KeyD",
+    bubbles: true,
+    cancelable: true,
+  });
+  popup.element().dispatchEvent(move);
+  expect(move.defaultPrevented).toBe(false);
+  await userEvent.keyboard("{Escape}");
+  await expect.element(popup).not.toBeInTheDocument();
 });

@@ -499,6 +499,7 @@ import {
   GuildCommandConflictError,
   GuildCommandRejection,
   GuildCreateMasterInput,
+  GuildContinueConversationInput,
   GuildEndConversationInput,
   GuildGetAdventurerProfileInput,
   GuildHireAdventurerInput,
@@ -687,6 +688,7 @@ export const WS_METHODS = {
   guildListAttempts: "guild.listAttempts",
   guildHireAdventurer: "guild.hireAdventurer",
   guildStartConversation: "guild.startConversation",
+  guildContinueConversation: "guild.continueConversation",
   guildEndConversation: "guild.endConversation",
   scheduledTasksSubscribe: "scheduledTasks.subscribe",
   scheduledTasksUpsert: "scheduledTasks.upsert",
@@ -2500,6 +2502,12 @@ const GuildStartConversationRpc = Rpc.make(WS_METHODS.guildStartConversation, {
   error: GuildMutationError,
 });
 
+const GuildContinueConversationRpc = Rpc.make(WS_METHODS.guildContinueConversation, {
+  payload: GuildContinueConversationInput,
+  success: Attempt,
+  error: GuildMutationError,
+});
+
 const GuildEndConversationRpc = Rpc.make(WS_METHODS.guildEndConversation, {
   payload: GuildEndConversationInput,
   success: Attempt,
@@ -2609,6 +2617,7 @@ const GuildRpcGroup = RpcGroup.make(
   GuildListAttemptsRpc,
   GuildHireAdventurerRpc,
   GuildStartConversationRpc,
+  GuildContinueConversationRpc,
   GuildEndConversationRpc,
 );
 

@@ -1,3 +1,4 @@
+import { MessageId } from "@t3tools/contracts";
 import { resolveBinding } from "@t3tools/guild-core/binding";
 import { transitionConversation } from "@t3tools/guild-core/lifecycle/attempt";
 import * as Context from "effect/Context";
@@ -15,6 +16,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as CommandReceipts from "../orchestration-v2/CommandReceiptStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as ThreadLaunch from "../orchestration-v2/ThreadLaunchService.ts";
+import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
 import * as VcsStatus from "../vcs/VcsStatusBroadcaster.ts";
 import * as GuildRunBridge from "./GuildRunBridge.ts";
@@ -51,8 +53,14 @@ export class GuildOutboxWorker extends Context.Service<
   }
 >()("t3/guild/GuildOutboxWorker") {}
 
+const commandIdFor = (row: OutboxRow) =>
+  row.kind === "launch"
+    ? GuildWorkStore.launchCommandId(row.id)
+    : GuildWorkStore.continueCommandId(row.id);
+
 const make = Effect.gen(function* () {
   const launch = yield* ThreadLaunch.ThreadLaunchService;
+  const threads = yield* ThreadManagement.ThreadManagementService;
   const receipts = yield* CommandReceipts.CommandReceiptStoreV2;
   const registry = yield* ProviderRegistry.ProviderRegistry;
   const projects = yield* ProjectStore.ProjectStoreV2;
@@ -64,7 +72,7 @@ const make = Effect.gen(function* () {
   const lock = yield* Semaphore.make(1);
 
   const accepted = Effect.fn("GuildOutboxWorker.accepted")(function* (row: OutboxRow) {
-    const receipt = yield* receipts.getByCommandId(GuildWorkStore.launchCommandId(row.id));
+    const receipt = yield* receipts.getByCommandId(commandIdFor(row));
     return Option.isSome(receipt) && receipt.value.status === "accepted";
   });
 
@@ -75,7 +83,9 @@ const make = Effect.gen(function* () {
     const threadId = yield* store
       .transaction(
         Effect.gen(function* () {
-          const before = yield* work.getAttempt(row.id);
+          const before = yield* work.getAttempt(
+            row.kind === "launch" ? row.id : row.payload.attemptId,
+          );
           yield* work.updateOutbox({
             id: row.id,
             status: error === null ? "done" : "failed",
@@ -83,18 +93,25 @@ const make = Effect.gen(function* () {
           });
           if (before === null) return null;
           const at = DateTime.formatIso(yield* DateTime.now);
-          const after = transitionConversation(
-            before,
-            error === null ? { type: "launched" } : { type: "launch_failed", at, reason: error },
-          );
+          const after =
+            row.kind === "launch"
+              ? transitionConversation(
+                  before,
+                  error === null
+                    ? { type: "launched" }
+                    : { type: "launch_failed", at, reason: error },
+                )
+              : before.status === "active" && before.statusReason !== error
+                ? { ...before, statusReason: error }
+                : before;
           if (before !== after) {
             yield* work.saveAttempt(after);
             yield* store.appendActivity({
-              ...attemptActivity(before, after),
+              ...(yield* attemptActivity(before, after, store, work)),
               at,
-              change: error === null ? "launch_accepted" : "launch_failed",
+              change: `${row.kind}_${error === null ? "accepted" : "failed"}`,
               actor: "system",
-              commandId: GuildWorkStore.launchCommandId(row.id),
+              commandId: commandIdFor(row),
             });
           }
           return after.threadId;
@@ -104,7 +121,8 @@ const make = Effect.gen(function* () {
         Effect.tap(() => guild.notifyCommitted),
         Effect.uninterruptible,
       );
-    if (error === null && threadId !== null) yield* bridge.reconcile(threadId);
+    if (row.kind === "launch" && error === null && threadId !== null)
+      yield* bridge.reconcile(threadId);
   });
 
   const workspaceStrategy = Effect.fn("GuildOutboxWorker.workspaceStrategy")(function* (
@@ -130,10 +148,44 @@ const make = Effect.gen(function* () {
     return { type: "worktree", baseRef: local.refName };
   });
 
+  const continueConversation = Effect.fn("GuildOutboxWorker.continueConversation")(function* (
+    row: Extract<OutboxRow, { kind: "continue" }>,
+  ) {
+    const attempt = yield* work.getAttempt(row.payload.attemptId);
+    if (attempt?.status !== "active")
+      return yield* settle(row, "This conversation is no longer active.");
+    const adventurer = yield* store.getAdventurer(attempt.adventurerId);
+    if (adventurer?.status !== "active") return yield* settle(row, "Choose an active adventurer.");
+    const resolution = resolveBinding(adventurer.binding, yield* registry.getProviders);
+    if ("error" in resolution) return yield* settle(row, resolution.error.reason);
+
+    const commandId = commandIdFor(row);
+    const result = yield* threads
+      .dispatch({
+        type: "message.dispatch",
+        commandId,
+        threadId: attempt.threadId,
+        messageId: MessageId.make(commandId),
+        text: row.payload.text,
+        attachments: [],
+        modelSelection: resolution.ok,
+        dispatchMode: { type: "queue_after_active" },
+        createdBy: "user",
+        creationSource: "web",
+      })
+      .pipe(Effect.result);
+    if (Result.isFailure(result) && !(yield* accepted(row))) {
+      yield* settle(row, "Could not send the message. Open the conversation to check the thread.");
+    } else {
+      yield* settle(row, null);
+    }
+  });
+
   const run = Effect.fn("GuildOutboxWorker.run")(function* (row: OutboxRow) {
+    if (yield* accepted(row)) return yield* settle(row, null);
+    if (row.kind === "continue") return yield* continueConversation(row);
     const attempt = yield* work.getAttempt(row.id);
     if (attempt === null) return yield* settle(row, "The Guild attempt is missing.");
-    if (yield* accepted(row)) return yield* settle(row, null);
     if (attempt.status !== "starting")
       return yield* settle(row, "The Guild attempt is no longer starting.");
 
@@ -200,7 +252,7 @@ const make = Effect.gen(function* () {
     yield* recover().pipe(
       Effect.andThen(drain()),
       Effect.andThen(Effect.forever(PubSub.take(committed).pipe(Effect.andThen(drain())))),
-      Effect.tapError((error) => Effect.logWarning("Guild launch outbox failed", { error })),
+      Effect.tapError((error) => Effect.logWarning("Guild outbox failed", { error })),
       Effect.retry(Schedule.spaced("1 second")),
       Effect.forkScoped,
     );

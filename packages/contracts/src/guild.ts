@@ -246,7 +246,11 @@ export const AdventurerSummary = Schema.Struct({
   ...Struct.pick(Adventurer.fields, ["id", "name", "appearance", "classId", "status", "level"]),
   binding: ModelBinding.mapFields(Struct.pick(["providerInstanceId", "family", "pinnedModel"])),
   latestConversation: Schema.NullOr(
-    Schema.Struct({ attemptId: GuildAttemptId, threadId: ThreadId }),
+    Schema.Struct({
+      attemptId: GuildAttemptId,
+      threadId: ThreadId,
+      terminal: Schema.optionalKey(Attempt.mapFields(Struct.pick(["status", "statusReason"]))),
+    }),
   ),
 });
 export type AdventurerSummary = typeof AdventurerSummary.Type;
@@ -256,6 +260,7 @@ export const GuildSnapshot = Schema.Struct({
   master: Schema.NullOr(GuildMaster),
   adventurers: Schema.Array(AdventurerSummary),
   attempts: Schema.Array(Attempt),
+  attemptThreadIds: Schema.optionalKey(Schema.Array(ThreadId)),
 });
 export type GuildSnapshot = typeof GuildSnapshot.Type;
 
@@ -383,6 +388,8 @@ export class GuildConversationError extends Schema.TaggedError<GuildConversation
       "project_unavailable",
       "conversation_already_open",
       "conversation_not_active",
+      "conversation_busy",
+      "conversation_needs_attention",
     ]),
   },
 ) {
@@ -396,6 +403,10 @@ export class GuildConversationError extends Schema.TaggedError<GuildConversation
         return "Open or end the adventurer's current conversation first.";
       case "conversation_not_active":
         return "This conversation is no longer active.";
+      case "conversation_busy":
+        return "Wait for the conversation to finish its current work before ending it.";
+      case "conversation_needs_attention":
+        return "Respond to the pending request before ending this conversation.";
     }
   }
 }
@@ -472,6 +483,13 @@ export const GuildStartConversationInput = Schema.Struct({
   workspace: Schema.Literals(["root", "worktree"]),
 });
 export type GuildStartConversationInput = typeof GuildStartConversationInput.Type;
+export const GuildContinueConversationInput = Schema.Struct({
+  commandId: CommandId,
+  attemptId: GuildAttemptId,
+  message: TrimmedNonEmptyString,
+});
+export type GuildContinueConversationInput = typeof GuildContinueConversationInput.Type;
+
 export const GuildEndConversationInput = Schema.Struct({
   commandId: CommandId,
   attemptId: GuildAttemptId,

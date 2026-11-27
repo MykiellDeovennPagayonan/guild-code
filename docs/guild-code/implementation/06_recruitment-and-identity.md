@@ -108,7 +108,7 @@ type ModelBinding = {
 
 T3 has no model-family concept (00 §5). Guild derives families from what discovery actually reports, in `packages/guild-core/src/families.ts`:
 
-1. **Claude driver (`claudeAgent`)**: families are the Claude Code family aliases T3 already uses (`opus`, `sonnet`, `haiku`, `fable`; `apps/server/src/provider/ClaudeModelCatalog.ts:434-439`). A model belongs to a family if its slug or one of its `aliases` equals the alias or starts with `<alias>-`.
+1. **Claude driver (`claudeAgent`)**: families are the Claude Code family aliases T3 already uses (`opus`, `sonnet`, `haiku`, `fable`; `apps/server/src/provider/ClaudeModelCatalog.ts:434-439`). A model belongs to a family if its slug, an alias, or its display name contains that family alias as a whole word or segment.
 2. **Any driver whose models carry aliases**: a bare alias without digits (from the model manifest's `aliases`) defines a family; models sharing it belong to it.
 3. **Otherwise**: each model is its own family (key `<driver>:<slug>`). The binding is then effectively exact-model.
 
@@ -157,7 +157,7 @@ If the user changes an adventurer thread's model in focus mode (allowed by T3), 
 
 Talking to a hired adventurer opens the **dialogue overlay** (13 §Dialogue) with: name, class + emblem, level, model family (and pinned model), current activity from real status (07), latest meaningful status line, and actions:
 
-- **Give orders** (or **Continue** if a conversation is open): pick a T3 project (default: last used for this adventurer), type the message, choose workspace (project root, or new worktree), send. Calls `guild.startConversation({ commandId, adventurerId, projectId, message, workspace })`.
+- **Give orders** (when no conversation is open): pick a T3 project (default: last used for this adventurer), type the message, choose workspace (project root, or new worktree), send. Calls `guild.startConversation({ commandId, adventurerId, projectId, message, workspace })`.
 - **Open conversation**: navigates to the attempt's thread in focus mode, or opens it in the hybrid side panel (13).
 - **Profile**.
 
@@ -177,7 +177,7 @@ You are <Name>, a <Class> in the user's guild. <role template or the adventurer'
 [End of briefing]
 ```
 
-It is visible in the transcript; nothing is hidden from the user. Later messages the user sends from the dialogue ("Continue") go to the same thread through T3's existing client command for a new turn (`startThreadTurn`, `packages/client-runtime/src/operations/commands.ts`, which dispatches `message.dispatch`) **without** a `modelSelection`, so the thread keeps its bound model and they reach the correct bound session (PTY-11). Before sending, the dialogue re-runs `resolveBinding`; on an error it shows the reason and doesn't send. **End conversation** marks the attempt `completed` (08 §Attempt states). Starting a new conversation creates a new attempt and thread; the adventurer stays the same (PRO-09).
+It is visible in the transcript; nothing is hidden from the user. **Continue** sends later messages to the same thread through `guild.continueConversation`. The server resolves the adventurer’s binding against current provider discovery and returns a typed error when it cannot resolve it. The Guild outbox dispatches with the explicit model selection and a deterministic T3 command ID (PTY-11). **End conversation** requires the thread to have no active work or pending runtime request before it marks the attempt `completed` (08 §Attempt states). Starting a new conversation creates a new attempt and thread; the adventurer stays the same (PRO-09).
 
 In Increment 1 the dialogue's "current quest" (PTY-10) reads "No quest · conversation"; quests arrive in Increment 2.
 

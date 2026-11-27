@@ -76,6 +76,7 @@ const now = DateTime.now.pipe(Effect.map(DateTime.formatIso));
 
 const make = Effect.gen(function* () {
   const store = yield* GuildStore.GuildStore;
+  const work = yield* GuildWorkStore.GuildWorkStore;
   const random = yield* SecureRandom.SecureRandom;
   const committed = yield* PubSub.sliding<void>(1);
   const notifyCommitted = PubSub.publish(committed, undefined).pipe(Effect.asVoid);
@@ -182,6 +183,7 @@ const make = Effect.gen(function* () {
           master: yield* store.getMaster(),
           adventurers: yield* store.listAdventurerSummaries(),
           attempts: yield* store.listLiveAttempts(),
+          attemptThreadIds: yield* work.listAttemptThreads(),
         },
       });
     }

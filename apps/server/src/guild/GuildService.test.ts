@@ -150,7 +150,11 @@ it.effect(
         assert.deepEqual(
           snapshot.adventurers.map((entry) => entry.latestConversation),
           [
-            { attemptId: attemptId(0, "latest"), threadId: ThreadId.make("thread-0-latest") },
+            {
+              attemptId: attemptId(0, "latest"),
+              threadId: ThreadId.make("thread-0-latest"),
+              terminal: { status: "completed", statusReason: null },
+            },
             { attemptId: attemptId(1, "latest"), threadId: ThreadId.make("thread-1-latest") },
           ],
         );
