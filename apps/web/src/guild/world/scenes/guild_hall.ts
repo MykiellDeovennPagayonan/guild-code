@@ -1,12 +1,20 @@
-import { flatRoom, type SceneDef } from "../../engine/scene";
-
-const floor = 180;
+import { flatRoom, ROOM_FLOOR as floor, type SceneDef } from "../../engine/scene";
 
 export const guildHall = {
   ...flatRoom(42),
   id: "guild_hall",
   name: "Guild Hall",
-  palette: "guild_hall",
+  architecture: {
+    windows: [27, 108, 234, 310, 398, 463],
+    beams: [13, 94, 176, 286, 364, 438, 492],
+    glows: [
+      [44, 173, 15],
+      [96, 119],
+      [287, 119],
+      [451, 163],
+      [473, 145],
+    ],
+  },
   spawn: { x: 78, y: floor },
   doors: [
     {
@@ -29,7 +37,7 @@ export const guildHall = {
       x: 157,
       y: floor,
       width: 32,
-      height: 30,
+      height: 47,
       label: "Quest Board (Coming soon)",
     },
     {
@@ -38,22 +46,25 @@ export const guildHall = {
       x: 374,
       y: floor,
       width: 20,
-      height: 24,
+      height: 42,
       label: "Ring Bell",
     },
   ],
   props: [
-    { propId: "lantern", x: 22, y: 110 },
     { propId: "hearth", x: 44, y: floor },
-    { propId: "bench", x: 71, y: floor },
-    { propId: "banner", x: 112, y: 123 },
-    { propId: "quest_board", x: 157, y: floor },
-    { propId: "lantern", x: 191, y: 132 },
-    { propId: "work_table", x: 221, y: floor },
-    { propId: "work_table", x: 274, y: floor },
-    { propId: "banner", x: 294, y: 123 },
-    { propId: "long_table", x: 326, y: floor },
-    { propId: "bell", x: 374, y: floor },
+    { propId: "stool", x: 18, y: floor },
+    { propId: "stool", x: 69, y: floor },
+    { propId: "longTable", x: 112, y: floor },
+    { propId: "bench", x: 116, y: floor + 2 },
+    { propId: "questBoard", x: 157, y: 152 },
+    { propId: "banner", x: 201, y: 123 },
+    { propId: "workTable", x: 220, y: floor },
+    { propId: "stool", x: 244, y: floor },
+    { propId: "workTable", x: 273, y: floor },
+    { propId: "bell", x: 374, y: 151 },
+    { propId: "banner", x: 431, y: 123 },
+    { propId: "lantern", x: 96, y: 124 },
+    { propId: "lantern", x: 287, y: 124 },
     { propId: "lantern", x: 473, y: 150 },
   ],
   npcSlots: [
