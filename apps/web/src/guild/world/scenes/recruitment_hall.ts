@@ -1,12 +1,18 @@
-import { flatRoom, type SceneDef } from "../../engine/scene";
-
-const floor = 180;
+import { flatRoom, ROOM_FLOOR as floor, type SceneDef } from "../../engine/scene";
 
 export const recruitmentHall = {
   ...flatRoom(36),
   id: "recruitment_hall",
   name: "Recruitment Hall",
-  palette: "recruitment_hall",
+  architecture: {
+    windows: [59, 150, 224, 310, 381],
+    beams: [17, 132, 207, 294, 365, 420],
+    glows: [
+      [35, 163],
+      [134, 121],
+      [208, 121],
+    ],
+  },
   spawn: { x: 69, y: floor },
   doors: [
     {
@@ -28,22 +34,20 @@ export const recruitmentHall = {
       id: "reception",
       x: 130,
       y: floor,
-      width: 40,
+      width: 46,
       height: 21,
       label: "Recruit at Reception",
     },
   ],
   props: [
-    { propId: "lantern", x: 19, y: 150 },
-    { propId: "notice_board", x: 89, y: floor - 8 },
-    { propId: "reception_desk", x: 130, y: floor },
-    { propId: "banner", x: 187, y: 125 },
-    { propId: "rug", x: 208, y: floor - 2 },
-    { propId: "rug", x: 246, y: floor - 2 },
-    { propId: "rug", x: 284, y: floor - 2 },
-    { propId: "rug", x: 322, y: floor - 2 },
-    { propId: "banner", x: 341, y: 125 },
-    { propId: "lantern", x: 386, y: 132 },
+    { propId: "banner", x: 94, y: 123 },
+    { propId: "banner", x: 275, y: 123 },
+    { propId: "receptionDesk", x: 130, y: floor },
+    { propId: "noticeBoard", x: 188, y: 144 },
+    { propId: "rug", x: 227, y: floor + 9 },
+    { propId: "rug", x: 303, y: floor + 9 },
+    { propId: "lantern", x: 134, y: 126 },
+    { propId: "lantern", x: 208, y: 126 },
   ],
   npcSlots: [
     { id: "candidate_1", x: 208, kind: "stand", activity: ["available"] },
