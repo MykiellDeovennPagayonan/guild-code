@@ -29,15 +29,15 @@ T3-03, T3-04, PIL-01, NAV-02, NAV-03, PRO-01…PRO-09, HIER-01…HIER-05, QST-05
 
 T3 already uses "run" for one user-to-agent turn cycle. To avoid confusion in code:
 
-| Brief term | Guild code name | T3 counterpart |
-|---|---|---|
-| Epic | `Epic` | one `Project` (`ProjectId`) |
-| Mission | `Mission` | one primary thread (`ThreadId`) |
-| Quest | `Quest` | none (Guild-only) |
-| Run/attempt | `Attempt` (UI: "Attempt") | one thread (`ThreadId`) launched for that attempt |
-| — | `AttemptTurn` | one T3 **provider turn** (`ProviderTurnId`) inside the attempt's thread, with its T3 run (`RunId`) |
-| Adventurer | `Adventurer` | none; bound to threads through attempts |
-| Guild Master | `GuildMaster` | none; the user |
+| Brief term   | Guild code name           | T3 counterpart                                                                                     |
+| ------------ | ------------------------- | -------------------------------------------------------------------------------------------------- |
+| Epic         | `Epic`                    | one `Project` (`ProjectId`)                                                                        |
+| Mission      | `Mission`                 | one primary thread (`ThreadId`)                                                                    |
+| Quest        | `Quest`                   | none (Guild-only)                                                                                  |
+| Run/attempt  | `Attempt` (UI: "Attempt") | one thread (`ThreadId`) launched for that attempt                                                  |
+| —            | `AttemptTurn`             | one T3 **provider turn** (`ProviderTurnId`) inside the attempt's thread, with its T3 run (`RunId`) |
+| Adventurer   | `Adventurer`              | none; bound to threads through attempts                                                            |
+| Guild Master | `GuildMaster`             | none; the user                                                                                     |
 
 Never call a Guild attempt a "run" in code. In UI copy, "Run" may appear only where it means a T3 turn. T3 also has `RunAttempt` (`RunAttemptId`): one try at executing a T3 run, which can retry or restart (`packages/contracts/src/orchestrationV2.ts:883`). It is unrelated to a Guild `Attempt`; always qualify it as "T3 run attempt" in code comments and names (`t3RunAttemptId`).
 
@@ -72,60 +72,31 @@ Every Guild entity has a branded string ID schema in `packages/contracts/src/gui
 
 Field lists are the minimum each increment needs. Types are conceptual; the Effect Schemas in contracts are authoritative once written.
 
-**GuildSettings** (one row) — Increment 1
-- `candidatePool: { seed: string; hiredIndices: int[] }` — current recruitment pool (06 §Candidates).
-- `maxConcurrentAttempts: int` (default 3) and `maxConcurrentAttemptsPerProvider: Record<ProviderInstanceId, int>` (optional) — Guild's own budget, since T3 has none (00 §5). Increment 3 uses them; Increment 1 stores the default.
-- `xpRulesVersion: int`.
+#### Identity and attempts
 
-**GuildMaster** (one row) — Increment 1
-- `name: string`, `appearance: Appearance` (03 §Appearance), `createdAt`.
-- `location: { sceneId, doorId | null, x, facing }`, saved on scene change and when leaving the Guild view, never per frame (NAV-02).
-- Not an adventurer, never bound to a provider (NAV-03).
+The Increment 1 schemas live in [guild.ts](../../../packages/contracts/src/guild.ts) and the tables in [migration 120](../../../apps/server/src/persistence/Migrations/120_GuildIdentity.ts).
 
-**Adventurer** — Increment 1
-- `id`, `name`, `appearance: Appearance`, `appearanceVersion: int` (PRO-01).
-- `classId: ClassId` (06 §Classes), `specialties: string[]`, `rank: string | null` (PRO-02).
-- `binding: ModelBinding` (06 §Model bindings) (PRO-03).
-- `defaults: { runtimeMode, interactionMode, maxWriteAttempts: int /* default 1 */ }` — the T3 permission policy and interaction mode used when Guild launches this adventurer's threads, and the per-adventurer write limit (09 §Availability and concurrency). Changing them is an explicit, logged user action. Class never changes them (CLS-01, T3-07).
-- `lastProjectId: ProjectId | null` — the project used for the most recent "Give orders", for the dialogue's default.
-- `instructions: string` — the persistent instruction profile appended to every launch (PRO-04).
-- `loadout: Loadout | null` — Increment 5: project instruction references, allowed Guild tools, allowed test commands, context packs ([12](12_knowledge-and-loadouts.md) §What a loadout can honestly contain).
-- `status: "active" | "archived"` (PRO-09; 06 §Lifecycle).
-- `xp: int`, `level: int` — cached projections of RewardEvent rows (11 §XP); recomputable.
-- `createdAt`, `hiredAt`, `updatedAt`.
-
-**AdventurerChange** — Increment 1
-- `adventurerId`, `at`, `kind: "hired" | "renamed" | "class_changed" | "binding_changed" | "defaults_changed" | "instructions_changed" | "appearance_changed" | "archived" | "restored"`, `before: Json | null`, `after: Json`, `actor: "user" | "system"`.
-- Append-only. This is the audit trail for MOD-05 and PRO-02.
-
-**Attempt** — Increment 1 (conversations), Increment 2 (quest attempts)
-- `id`, `adventurerId`, `kind: "conversation" | "quest"`, `questId | null`, `attemptNumber: int | null` (per quest, 1-based), `role: AssignmentRole | null`.
-- `classIdAtStart: ClassId` and `familyKeyAtStart: string` — snapshot for per-class and per-family statistics (11).
-- `threadId: ThreadId` (unique), `projectId: ProjectId`.
-- `providerInstanceId`, `requestedModel: string`, `requestedOptions: Json | null` — what Guild asked for.
-- `executedModels: string[]` — every distinct model T3 reported for this attempt's turns (MOD-04).
-- `status: AttemptStatus` (08 §Attempt states), `statusReason: string | null`, `errorClass | null`.
-- `workspace: { strategy, worktreePath | null, branch | null, baseRevision | null }`.
-- `usage: { status: "complete" | "partial" | "unavailable", inputTokens?, outputTokens?, cachedInputTokens?, cacheCreationTokens?, reasoningTokens? }` — summed from turns; `unavailable` when no turn reported usage. Missing numbers stay missing, never 0 (STAT-05).
-- `startedAt`, `endedAt | null`, `createdAt`.
-
-**AttemptTurn** — Increment 1
-- `attemptId`, `providerTurnId: ProviderTurnId` (unique; makes bridge updates idempotent), `t3RunAttemptId | null`, `t3RunId | null` (resolved from the T3 run attempt), `status`, `requestedModel`, `executedModel | null` (T3's `ProviderTurn.model`), `turnTokenUsage: Json | null` (copied from `ProviderTurn.turnTokenUsage`), `errorClass | null`, `startedAt`, `endedAt | null`.
-- One row per **provider turn**, because one T3 run can have several run attempts (retry, steering restart, provider recovery) and several provider turns, each reporting its own model (`OrchestrationV2ProviderTurn` has `runAttemptId`, not `runId`; `packages/contracts/src/orchestrationV2.ts:1358`).
-- Copied from T3 as turns happen, because T3's event log expires after a day (00 §1).
+- Guild settings and the Guild Master are singletons. The Guild Master represents the user and has no provider binding. Save the master's location on scene change and when leaving the Guild view (NAV-02).
+- Adventurer identity outlives project, binding and lifecycle changes. Appearance is versioned. Record meaningful edits in the append-only adventurer change history. Class never changes the defaults a user approved. XP and level are cached projections once rewards exist. Loadouts arrive in Increment 5.
+- An attempt preserves the class, family and model requested at its start and links to a unique T3 thread. Store model drift from each provider turn so per-model history survives session changes. Quest links and quest attempts arrive in Increment 2.
+- One attempt turn records one provider turn. A T3 run may span several T3 run attempts and provider turns. Keep both T3 run IDs and deduplicate by provider turn ID. Missing token counts stay absent, including when other counts from the same turn were reported.
 
 **Kingdom** — Increment 2 (optional grouping, HIER-04)
+
 - `id`, `name`, `bannerPalette: string` (a palette id), `createdAt`, `archivedAt | null`.
 
 **Epic** — Increment 2
+
 - `id`, `projectId: ProjectId` (unique; one epic per project), `kingdomId | null`, `instructions: string`, `biome: string | null` (later, LATER-01), `createdAt`, `archivedAt | null`.
 - Repository, default branch and workspace come from the T3 project and Git at read time; Guild does not copy them (single source of truth). Multiple repositories (HIER-04) are T3's: a project's `trackedFolders` (`packages/contracts/src/orchestrationProject.ts`) and multi-repository worktrees (`workspaceStrategy.worktree.repositories`) are shown on the epic and used as T3 uses them; Guild adds no repository list of its own.
 
 **Mission** — Increment 2 (HIER-05)
+
 - `id`, `epicId`, `primaryThreadId: ThreadId | null` (unique when set; null only for a quick mission until its first attempt's thread becomes primary, 08 §Quick quests), `leaderAttemptId: GuildAttemptId | null` (the leader's conversation attempt, 09 §Leader workflow), `title`, `objective`, `context`, `constraints`, `plan: string` (markdown), `acceptanceCriteria: Criterion[]`, `targetBranch | null`, `integrationBranch | null`, `requiresMerge: boolean`, `status: MissionStatus` (08), `statusBeforePause | null`, `createdAt`, `updatedAt`.
 - **Primary thread rule.** Created with a lead adventurer: the lead's conversation attempt thread is both `primaryThreadId` and `leaderAttemptId`'s thread. Created without one: the server launches a user thread with the epic project's `defaultModelSelection` passed **explicitly** (never through T3's fallback resolver); `leaderAttemptId` stays null. Appointing a leader later (Increment 3) creates a new leader attempt and sets `leaderAttemptId`; `primaryThreadId` does not change.
 
 **Quest** — Increment 2 (QST-05)
+
 - `id`, `missionId`, `title`, `category: QuestCategory` (08 §Categories), `objective`, `scope`, `expectedOutputs`, `deliverable: "code" | "report" | "tests" | "docs" | "decision"`.
 - `acceptanceCriteria: Criterion[]` where `Criterion = { id, text, evidence: EvidenceKind[] }` — each criterion names the evidence kinds that can satisfy it (08 §Evidence gates).
 - `priority: 1..4`, `difficulty: "trivial" | "small" | "medium" | "large"`.
@@ -135,46 +106,58 @@ Field lists are the minimum each increment needs. Types are conceptual; the Effe
 - `verificationRequired: boolean`, `createdBy: "user" | GuildAdventurerId`, `createdAt`, `updatedAt`.
 
 **QuestDependency** — Increment 2 storage, Increment 3 scheduling
+
 - `questId`, `prerequisiteQuestId`, unique pair, acyclic (validated with `guild-core` graph check).
 
 **QuestAssignment** — Increment 2
+
 - `questId`, `adventurerId`, `role: "implementer" | "investigator" | "reviewer" | "verifier" | "observer" | "leader"`, `assignedAt`, `unassignedAt | null`.
 
 **Evidence** — Increment 2
+
 - `id`, `questId`, `attemptId | null`, `criterionId | null`, `kind: EvidenceKind` (`diff | commit | pull_request | test_run | report | review_verdict | user_decision`), `revision: string | null` (commit SHA or checkpoint ref the evidence is about), `payload: Json` (kind-specific), `status: "valid" | "stale" | "superseded"`, `createdBy`, `createdAt`.
 - Evidence rules are in 08 and 10.
 
 **Finding** — Increment 3 (PTY-12)
+
 - `id`, `questId`, `attemptId`, `authorAdventurerId`, `severity: "critical" | "high" | "medium" | "low" | "info"`, `location: { path, line | null } | null`, `evidence: string`, `affectedRevision: string | null`, `recommendation: string`, `resolution: "open" | "accepted" | "rejected" | "fixed" | "wont_fix"`, `resolvedBy | null`, `resolutionNote | null`, `createdAt`, `updatedAt`.
 
 **Party, PartyMember, Formation, Expedition** — Increment 3 (09)
+
 - `Party { id, name | null, persistent: boolean, formationId | null, leaderAdventurerId | null, createdAt, disbandedAt | null }`
 - `PartyMember { partyId, adventurerId, role, joinedAt, leftAt | null }`
 - `Formation { id, name, slots: { role, preferredClass | null, count }[], policy: { mode, verificationRequired, maxParallel } }`
 - `Expedition { id, missionId, partyId, mode, status, startedAt, endedAt | null, budget }`, with `status: "planned" | "running" | "paused" | "completed" | "cancelled"`: `planned → running` (start), `running ↔ paused`, `running → completed` (mission delivered), any non-terminal `→ cancelled`, `cancelled → planned` (reopen). Transition table in `packages/guild-core/src/lifecycle/expedition.ts` (T3.5).
 
 **QuestNote** — Increment 2 (user comments) and Increment 3 (agent handoff notes)
+
 - `id`, `questId`, `author: "user" | GuildAdventurerId`, `text`, `createdAt`, `editedAt | null`, `deletedAt | null`. The user's quest comments (brief §8.4) and `guild_post_note` both write here.
 
 **UserEdit** — Increment 2 (10 §Attribution)
+
 - `id`, `worktreePath`, `attemptId | null` (the attempt holding the worktree at the time), `path`, `kind: "save" | "commit" | "takeover"`, `revision | null`, `at`.
 
 **GuildApproval** — Increment 3 (10 §Council)
+
 - `id`, `kind: "plan" | "scope_change" | "dependency_override" | "merge_gate" | "destructive_action" | "binding_change" | "defaults_change" | "budget_alert" | "conflict"`, `subject: { missionId?, questId?, attemptId? }`, `requestedBy: "system" | GuildAdventurerId`, `summary`, `details: Json`, `status: "pending" | "approved" | "rejected" | "expired"`, `decidedAt | null`, `note | null`.
 - `expired`: the server sets it when the subject reaches a terminal state (quest/mission/attempt done or cancelled) or is superseded by a newer approval of the same kind for the same subject, before the user decided.
 - Provider permission prompts stay T3 runtime requests; Guild lists them alongside but never copies or answers them on the user's behalf.
 
 **WorkspaceLease** — Increment 3/4 (10 §Workspace leases)
+
 - `id`, `worktreePath`, `branch`, `holder: { kind: "attempt"; attemptId } | { kind: "user" }`, `mode: "write" | "read"`, `baseRevision`, `acquiredAt`, `releasedAt | null`. At most one active write lease per worktree path. A `user` holder comes from take-over (10 §Workspace leases).
 
 **RewardEvent, Achievement** — Increment 2 / 5 (11)
+
 - `RewardEvent { id, adventurerId, sourceKey (unique), xp, category, questId | null, findingId | null, createdAt }`
 - `Achievement { adventurerId, achievementId, sourceKey (unique), awardedAt }`
 
 **JournalEntry** — Increment 5 (12)
+
 - `id`, `adventurerId`, `epicId` (scope; required), `kind: "discovery" | "decision" | "convention" | "lesson"`, `text`, `provenance: { attemptId, threadId, revision | null }`, `approvedAt`, `staleAt | null`, `updatedAt`, `deletedAt | null`.
 
 **GuildActivity** — Increment 1
+
 - `sequence: int` (autoincrement), `at`, `entity: string`, `entityId`, `change: string`, `before: Json | null`, `after: Json | null`, `actor`, `commandId | null`.
 - Every Guild mutation writes one or more rows in the same transaction. This is permanent history (chronicles, LATER-05) and the stream cursor (§Stream).
 
@@ -217,10 +200,10 @@ New RPCs in a `guild` group (contracts), handled thinly in `apps/server/src/ws.t
   - `snapshot { sequence, guild: GuildSnapshot }`
   - `changed { sequence, upserts: GuildEntity[], removals: { entity, id }[] }`
   - `synchronized { sequence }`
-  - Resume with the last `sequence`; the server replays `GuildActivity` after it or sends a fresh snapshot if too far behind.
-- `GuildSnapshot` contains only **live** data: settings, guild master, all adventurers (summaries, each with its latest conversation attempt id and thread id so "Open conversation" works for ended conversations too), non-terminal attempts, open missions and quests (plus the 50 most recent closed quests), active parties, pending approvals, epics, kingdoms.
+  - Resume with the last `sequence`. The server replays a bounded window of deltas from the permanent activity log or sends a fresh snapshot. Read the snapshot at the same sequence as its state and wake subscribers only after commit. See [GuildService](../../../apps/server/src/guild/GuildService.ts).
+- The Increment 1 snapshot contains settings, the Guild Master, adventurer summaries, and non-terminal attempts. Each summary links to its latest conversation, including an ended conversation. Later increments add open missions and quests (plus the 50 most recent closed quests), active parties, pending approvals, epics and kingdoms.
 - History is fetched on demand with query RPCs: `guild.getAdventurerProfile(id)`, `guild.getQuest(id)`, `guild.getMission(id)`, `guild.listAttempts({ adventurerId?, questId?, cursor })`, `guild.getStats(scope)`.
-- Mutations are RPCs named `guild.<verb>` (e.g. `guild.hireAdventurer`, `guild.postQuest`), each taking a `commandId`. Clients call them through `createEnvironmentRpcCommand` and gate UI with `permissionAtom`; add the guarded scopes to `CLIENT_GUARDED_RPC_SCOPES` (root AGENTS.md *Taste*).
+- Mutations are RPCs named `guild.<verb>` (e.g. `guild.hireAdventurer`, `guild.postQuest`), each taking a `commandId`. Clients call them through `createEnvironmentRpcCommand` and gate UI with `permissionAtom`; add the guarded scopes to `CLIENT_GUARDED_RPC_SCOPES` (root AGENTS.md _Taste_).
 - **Export** (brief §13 "backup/export"; Increment 4, T4.7): `guild.export()` returns a versioned JSON document of every Guild table (no T3 data, no secrets) for the user to save. The SQLite database itself is backed up with T3's existing storage tools. Import is out of scope for v1.
 - Wire budget: add the guild snapshot to the transfer budget test (`docs/internals/16_performance-regressions.md`). The snapshot must stay small: no transcripts, no diffs, no history arrays.
 

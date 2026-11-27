@@ -1,0 +1,23 @@
+{
+  "name": "@t3tools/guild-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./names": {
+      "types": "./src/names.ts",
+      "import": "./src/names.ts"
+    },
+    "./recruitment": {
+      "types": "./src/recruitment.ts",
+      "import": "./src/recruitment.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "effect-tsgo tsrs --noEmit",
+    "test": "vp test run --config ../../vite.config.ts --dir ."
+  },
+  "devDependencies": {
+    "vite-plus": "catalog:"
+  }
+}

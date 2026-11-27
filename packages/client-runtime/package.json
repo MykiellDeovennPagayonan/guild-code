@@ -263,6 +263,10 @@
       "types": "./src/state/filesystem.ts",
       "default": "./src/state/filesystem.ts"
     },
+    "./state/guild": {
+      "types": "./src/state/guild.ts",
+      "default": "./src/state/guild.ts"
+    },
     "./state/git": {
       "types": "./src/state/git.ts",
       "default": "./src/state/git.ts"

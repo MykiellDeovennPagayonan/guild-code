@@ -5,10 +5,14 @@ import { assert, it } from "@effect/vitest";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeHttpPlatform from "@effect/platform-node/NodeHttpPlatform";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import {
   ORCHESTRATION_PROTOCOL_HEADER,
   ORCHESTRATION_PROTOCOL_VERSION,
   AuthSessionId,
+  CommandId,
+  GuildSubscribeRpc,
+  WS_METHODS,
   AuthOrchestrationReadScope,
   EnvironmentHttpApi,
   EnvironmentId,
@@ -33,6 +37,7 @@ import {
   type OrchestrationV2ShellStreamItem,
   type ThreadId,
 } from "@t3tools/contracts";
+import { GuildPersistenceError } from "@t3tools/contracts/guild";
 import * as Context from "effect/Context";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
@@ -48,6 +53,8 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import { HttpRouter, HttpServer } from "effect/http";
 import { Rpc, RpcGroup, RpcServer, RpcSerialization } from "effect/rpc";
 import * as ServerEnvironment from "../src/environment/ServerEnvironment.ts";
+import * as GuildService from "../src/guild/GuildService.ts";
+import { appearance, seedAdventurers } from "../src/guild/GuildTestFixtures.ts";
 import * as SqlitePersistence from "../src/persistence/Sqlite.ts";
 import * as OrchestrationEventStore from "../src/persistence/OrchestrationEventStore.ts";
 import * as EventStore from "../src/orchestration-v2/EventStore.ts";
@@ -205,6 +212,7 @@ const layerServices = layerManagement.pipe(
   Layer.provideMerge(ProjectStore.layer),
   Layer.provideMerge(Layer.mock(ProjectService.ProjectService)({})),
   Layer.provideMerge(layerEnrichment),
+  Layer.provideMerge(GuildService.layer),
   Layer.provideMerge(layerPersistence),
 );
 class TransferApi extends HttpApi.make("environment").add(
@@ -221,6 +229,7 @@ const layerAuth = Layer.succeed(EnvironmentAuthenticatedAuth, (effect) =>
   ),
 );
 const group = RpcGroup.make(
+  GuildSubscribeRpc,
   Rpc.make(ORCHESTRATION_V2_WS_METHODS.subscribeThread, {
     payload: OrchestrationV2RpcSchemas.subscribeThread.input,
     success: OrchestrationV2RpcSchemas.subscribeThread.output,
@@ -235,6 +244,16 @@ const group = RpcGroup.make(
   }),
 );
 const layerHandlers = group.toLayer({
+  [WS_METHODS.guildSubscribe]: (input) =>
+    Stream.unwrap(
+      GuildService.GuildService.pipe(
+        Effect.map((guild) =>
+          guild
+            .subscribe(input)
+            .pipe(Stream.mapError((cause) => new GuildPersistenceError({ cause }))),
+        ),
+      ),
+    ),
   [ORCHESTRATION_V2_WS_METHODS.subscribeThread]: (input) =>
     Stream.unwrap(subscribeOrchestrationV2Thread(input)),
   [ORCHESTRATION_V2_WS_METHODS.subscribeShell]: (input) =>
@@ -325,6 +344,14 @@ it.live("reports V2 thread HTTP and WebSocket transfer budgets", () =>
         Effect.gen(function* () {
           const sink = yield* EventSink.EventSinkV2;
           const projection = yield* ProjectionStore.ProjectionStoreV2;
+          const rosterSize = 32;
+          const guild = yield* GuildService.GuildService;
+          yield* guild.createMaster({
+            commandId: CommandId.make("guild-master"),
+            name: "Mira",
+            appearance,
+          });
+          yield* seedAdventurers(rosterSize);
           yield* sink.write({ events: [threadCreated(provider)] });
           for (let index = 0; index < TRANSFER_HISTORY_TURN_COUNT; index++)
             yield* sink.write({ events: turnEvents(provider, index, false) });
@@ -344,6 +371,28 @@ it.live("reports V2 thread HTTP and WebSocket transfer budgets", () =>
           const address = Context.get(server, HttpServer.HttpServer).address;
           if (!("port" in address)) return yield* Effect.die("Expected TCP server");
           const base = `http://127.0.0.1:${address.port}`;
+          const guildClient = yield* openMeasuredWsClient({
+            url: `ws://127.0.0.1:${address.port}/ws`,
+            cookie: "",
+          });
+          const beforeGuild = guildClient.recorder.totals();
+          const guildItems = yield* guildClient.client[WS_METHODS.guildSubscribe]({}).pipe(
+            Stream.takeUntil((item) => item._tag === "synchronized"),
+            Stream.runCollect,
+          );
+          const guildTransfer = difference(guildClient.recorder.totals(), beforeGuild);
+          yield* guildClient.close;
+          const guildSnapshot = guildItems[0];
+          assert.isTrue(guildSnapshot?._tag === "snapshot");
+          if (guildSnapshot?._tag === "snapshot") {
+            assert.lengthOf(guildSnapshot.guild.adventurers, rosterSize);
+            assert.lengthOf(guildSnapshot.guild.attempts, rosterSize / 2);
+            assert.isTrue(
+              guildSnapshot.guild.adventurers.every(
+                ({ latestConversation }) => latestConversation !== null,
+              ),
+            );
+          }
           const threadSnapshot = yield* measureHttpGet({
             url: `${base}/api/orchestration/threads/${THREAD_ID}`,
             headers: { [ORCHESTRATION_PROTOCOL_HEADER]: String(ORCHESTRATION_PROTOCOL_VERSION) },
@@ -609,6 +658,7 @@ it.live("reports V2 thread HTTP and WebSocket transfer budgets", () =>
             provider,
             threadSnapshot,
             shellSnapshot,
+            guildSnapshot: { totals: guildTransfer },
             measuredTurnWebSocket,
             measuredTurnShellWebSocket,
             measuredTurnSecondClientWebSocket,
@@ -657,5 +707,5 @@ it.live("reports V2 thread HTTP and WebSocket transfer budgets", () =>
       if (path && contents) yield* fs.writeFileString(path, contents);
     yield* Effect.log(report);
     assert.deepEqual(transferBudgetViolations(runs), []);
-  }).pipe(Effect.provide(NodeServices.layer)),
+  }).pipe(Effect.provide(Layer.merge(NodeServices.layer, NodeCrypto.layer))),
 );
