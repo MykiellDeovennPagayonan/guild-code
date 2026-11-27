@@ -421,8 +421,8 @@ it("keeps a thread's running attempt and composer draft when toggling Guild", as
   const toggle = () =>
     userEvent.keyboard(
       navigator.platform.includes("Mac")
-        ? "{Meta>}{Shift>}g{/Shift}{/Meta}"
-        : "{Control>}{Shift>}g{/Shift}{/Control}",
+        ? "{Meta>}{Alt>}g{/Alt}{/Meta}"
+        : "{Control>}{Alt>}g{/Alt}{/Control}",
     );
   await toggle();
   await expect.element(page.getByRole("button", { name: "Active · 1" })).toBeVisible();
